@@ -32,7 +32,7 @@ jobs:
         with:
           msbuild-architecture: x64
 
-      - name: Build
+      - name: Build application
         shell: pwsh
         run: |
           msbuild ".\luvkrimes base\luvkrimes base.vcxproj" `
@@ -41,3 +41,18 @@ jobs:
             /p:Platform="x64" `
             /p:PreferredToolArchitecture="x64" `
             /verbosity:minimal
+
+      - name: Build tests
+        shell: pwsh
+        run: |
+          msbuild ".\tests\luvkrimes-tests.vcxproj" `
+            /m `
+            /p:Configuration="${{ matrix.configuration }}" `
+            /p:Platform="x64" `
+            /p:PreferredToolArchitecture="x64" `
+            /verbosity:minimal
+
+      - name: Run tests
+        shell: pwsh
+        run: |
+          & ".\tests\bin\x64\${{ matrix.configuration }}\luvkrimes-tests.exe"
