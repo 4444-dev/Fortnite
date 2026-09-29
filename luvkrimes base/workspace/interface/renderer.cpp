@@ -16,6 +16,42 @@ Renderer::~Renderer() {
 	Shutdown();
 }
 
+bool Renderer::CreateRenderTarget() {
+	if (!m_SwapChain || !m_Device) {
+		return false;
+	}
+
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
+	const HRESULT bufferResult = m_SwapChain->GetBuffer(
+		0,
+		IID_PPV_ARGS(backBuffer.GetAddressOf())
+	);
+
+	if (FAILED(bufferResult) || !backBuffer) {
+		logger::Log(
+			"[renderer] swap-chain GetBuffer failed (hr=0x%08lX)",
+			static_cast<unsigned long>(bufferResult)
+		);
+		return false;
+	}
+
+	const HRESULT rtvResult = m_Device->CreateRenderTargetView(
+		backBuffer.Get(),
+		nullptr,
+		m_RenderTargetView.GetAddressOf()
+	);
+
+	if (FAILED(rtvResult)) {
+		logger::Log(
+			"[renderer] CreateRenderTargetView failed (hr=0x%08lX)",
+			static_cast<unsigned long>(rtvResult)
+		);
+		return false;
+	}
+
+	return true;
+}
+
 bool Renderer::Initialize(HWND hwnd) {
 	if (!hwnd) {
 		return false;
@@ -54,31 +90,14 @@ bool Renderer::Initialize(HWND hwnd) {
 	);
 
 	if (FAILED(createResult)) {
-		logger::Log("[renderer] D3D11CreateDeviceAndSwapChain failed (hr=0x%08lX)",
-			static_cast<unsigned long>(createResult));
+		logger::Log(
+			"[renderer] D3D11CreateDeviceAndSwapChain failed (hr=0x%08lX)",
+			static_cast<unsigned long>(createResult)
+		);
 		return false;
 	}
 
-	Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
-	const HRESULT bufferResult = m_SwapChain->GetBuffer(
-		0,
-		IID_PPV_ARGS(backBuffer.GetAddressOf())
-	);
-	if (FAILED(bufferResult) || !backBuffer) {
-		logger::Log("[renderer] swap-chain GetBuffer failed (hr=0x%08lX)",
-			static_cast<unsigned long>(bufferResult));
-		Shutdown();
-		return false;
-	}
-
-	const HRESULT rtvResult = m_Device->CreateRenderTargetView(
-		backBuffer.Get(),
-		nullptr,
-		m_RenderTargetView.GetAddressOf()
-	);
-	if (FAILED(rtvResult)) {
-		logger::Log("[renderer] CreateRenderTargetView failed (hr=0x%08lX)",
-			static_cast<unsigned long>(rtvResult));
+	if (!CreateRenderTarget()) {
 		Shutdown();
 		return false;
 	}
@@ -125,7 +144,10 @@ bool Renderer::Initialize(HWND hwnd) {
 	}
 	m_Dx11BackendReady = true;
 
-	logger::Log("[renderer] initialized (feature level 0x%X)", static_cast<unsigned>(selectedLevel));
+	logger::Log(
+		"[renderer] initialized (feature level 0x%X)",
+		static_cast<unsigned>(selectedLevel)
+	);
 	return true;
 }
 
@@ -174,10 +196,45 @@ bool Renderer::EndFrame() {
 
 	const HRESULT result = m_SwapChain->Present(0, 0);
 	if (FAILED(result)) {
-		logger::Log("[renderer] Present failed (hr=0x%08lX)", static_cast<unsigned long>(result));
+		logger::Log(
+			"[renderer] Present failed (hr=0x%08lX)",
+			static_cast<unsigned long>(result)
+		);
 		return false;
 	}
 
+	return true;
+}
+
+bool Renderer::Resize(UINT width, UINT height) {
+	if (!m_SwapChain || !m_DeviceContext || width == 0 || height == 0) {
+		return false;
+	}
+
+	m_DeviceContext->OMSetRenderTargets(0, nullptr, nullptr);
+	m_RenderTargetView.Reset();
+
+	const HRESULT result = m_SwapChain->ResizeBuffers(
+		0,
+		width,
+		height,
+		DXGI_FORMAT_UNKNOWN,
+		0
+	);
+
+	if (FAILED(result)) {
+		logger::Log(
+			"[renderer] ResizeBuffers failed (hr=0x%08lX)",
+			static_cast<unsigned long>(result)
+		);
+		return false;
+	}
+
+	if (!CreateRenderTarget()) {
+		return false;
+	}
+
+	logger::Log("[renderer] resized to %ux%u", width, height);
 	return true;
 }
 
