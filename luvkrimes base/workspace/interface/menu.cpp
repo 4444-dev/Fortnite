@@ -432,6 +432,11 @@ namespace {
 		info( "game", "fortnite" );
 		info( "world", status.world_valid ? "ok" : "invalid" );
 		info( "camera", status.camera_valid ? "ok" : "invalid" );
+
+		char actors[ 16 ] {};
+		std::snprintf( actors, sizeof( actors ), "%d", status.actor_count );
+		info( "actors", actors );
+
 		char players[ 16 ] {};
 		std::snprintf( players, sizeof( players ), "%d", status.player_count );
 		info( "players", players );
@@ -439,6 +444,22 @@ namespace {
 		char fps[ 16 ] {};
 		std::snprintf( fps, sizeof( fps ), "%.0f", status.fps );
 		info( "fps", fps );
+
+		char frameMs[ 24 ] {};
+		std::snprintf( frameMs, sizeof( frameMs ), "%.2f ms", status.frame_ms );
+		info( "frame", frameMs );
+
+		char engineMs[ 24 ] {};
+		std::snprintf( engineMs, sizeof( engineMs ), "%.3f ms", status.engine_ms );
+		info( "engine", engineMs );
+
+		char actorsMs[ 24 ] {};
+		std::snprintf( actorsMs, sizeof( actorsMs ), "%.3f ms", status.actors_ms );
+		info( "actor scan", actorsMs );
+
+		char playersMs[ 24 ] {};
+		std::snprintf( playersMs, sizeof( playersMs ), "%.3f ms", status.players_ms );
+		info( "player cache", playersMs );
 		end_group( );
 	}
 
