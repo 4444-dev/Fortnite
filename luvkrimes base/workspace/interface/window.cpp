@@ -1,6 +1,7 @@
 #include <workspace/interface/window.hpp>
 
 #include <dwmapi.h>
+#include <thirdparty/imgui/imgui.h>
 #include <thirdparty/imgui/backends/imgui_impl_win32.h>
 #include <workspace/util/logger/logger.hpp>
 
@@ -136,8 +137,11 @@ void Window::SetClickThrough(bool enabled) const {
 		style &= ~WS_EX_TRANSPARENT;
 	}
 
-	if (!SetWindowLongPtrW(m_Hwnd, GWL_EXSTYLE, style) && GetLastError() != ERROR_SUCCESS) {
-		logger::Log("[window] SetWindowLongPtrW failed (%lu)", GetLastError());
+	SetLastError(ERROR_SUCCESS);
+	const LONG_PTR previousStyle = SetWindowLongPtrW(m_Hwnd, GWL_EXSTYLE, style);
+	const DWORD error = GetLastError();
+	if (previousStyle == 0 && error != ERROR_SUCCESS) {
+		logger::Log("[window] SetWindowLongPtrW failed (%lu)", error);
 	}
 }
 
