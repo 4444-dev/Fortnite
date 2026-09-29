@@ -91,6 +91,8 @@
     <ClCompile Include="workspace\game\cache\camera.cpp" />
     <ClCompile Include="workspace\game\features\player\player.cpp" />
     <ClCompile Include="workspace\interface\interface.cpp" />
+    <ClCompile Include="workspace\interface\renderer.cpp" />
+    <ClCompile Include="workspace\interface\window.cpp" />
     <ClCompile Include="workspace\interface\menu.cpp" />
     <ClCompile Include="workspace\util\logger\logger.cpp" />
     <ClCompile Include="thirdparty\imgui\imgui.cpp" />
@@ -117,6 +119,8 @@
     <ClInclude Include="workspace\game\cache\camera.hpp" />
     <ClInclude Include="workspace\game\features\player\player.hpp" />
     <ClInclude Include="workspace\interface\interface.hpp" />
+    <ClInclude Include="workspace\interface\renderer.hpp" />
+    <ClInclude Include="workspace\interface\window.hpp" />
     <ClInclude Include="workspace\interface\menu.hpp" />
     <ClInclude Include="workspace\util\logger\logger.hpp" />
     <ClInclude Include="thirdparty\imgui\imconfig.h" />
