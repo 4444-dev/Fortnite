@@ -188,12 +188,20 @@ bool RunLoop(Window& window, Renderer& renderer, PlayerCache& players, CameraCac
 		);
 
 		if (menuOpen) {
-			const menu::RuntimeStatus status{
-				players.World() != nullptr,
-				camera.Valid(),
-				static_cast<int>(players.Count()),
-				renderer.Fps()
-			};
+			const PlayerCacheStats cacheStats = players.Stats();
+			const float fps = renderer.Fps();
+
+			menu::RuntimeStatus status{};
+			status.world_valid = players.World() != nullptr;
+			status.camera_valid = camera.Valid();
+			status.actor_count = static_cast<int>(cacheStats.ActorCount);
+			status.player_count = static_cast<int>(cacheStats.PlayerCount);
+			status.fps = fps;
+			status.frame_ms = fps > 0.0f ? 1000.0f / fps : 0.0f;
+			status.engine_ms = static_cast<float>(cacheStats.EngineMs);
+			status.actors_ms = static_cast<float>(cacheStats.ActorsMs);
+			status.players_ms = static_cast<float>(cacheStats.PlayersMs);
+
 			menu::render(status);
 		}
 
