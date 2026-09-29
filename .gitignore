@@ -14,3 +14,5 @@ build/
 *.ilk
 *.log
 offsets_dump.txt
+bin/
+obj/
