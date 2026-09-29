@@ -34,7 +34,7 @@ namespace {
 		const float rightFootX = static_cast<float>( rightFoot.X );
 		const float rightFootY = static_cast<float>( rightFoot.Y );
 
-		const float feetY = std::max( leftFootY, rightFootY );
+		const float feetY = leftFootY > rightFootY ? leftFootY : rightFootY;
 		const float bodyHeight = feetY - headY;
 		if ( !std::isfinite( bodyHeight ) || bodyHeight < 8.0f )
 			return box;
