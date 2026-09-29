@@ -60,6 +60,28 @@ int main() {
 		return 1;
 	}
 
+	output.SetInt("count", 84);
+	if (!Check(output.Save(path), "replace existing config")) {
+		return 1;
+	}
+
+	util::KeyValueConfig replaced;
+	int replacedCount = 0;
+	if (!Check(
+		replaced.Load(path) &&
+		replaced.TryGetInt("count", replacedCount) &&
+		replacedCount == 84,
+		"atomic replacement roundtrip"
+	)) {
+		return 1;
+	}
+
+	std::filesystem::path temporary = path;
+	temporary += ".tmp";
+	if (!Check(!std::filesystem::exists(temporary), "temporary file cleanup")) {
+		return 1;
+	}
+
 	{
 		std::ofstream manual(path, std::ios::trunc);
 		manual
