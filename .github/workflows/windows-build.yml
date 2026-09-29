@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - cleanup/stability-refactor
   pull_request:
     branches:
       - main
@@ -30,6 +29,8 @@ jobs:
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
 
       - name: Build
         shell: pwsh
@@ -38,6 +39,5 @@ jobs:
             /m `
             /p:Configuration="${{ matrix.configuration }}" `
             /p:Platform="x64" `
-            /p:PlatformToolset="v143" `
             /p:PreferredToolArchitecture="x64" `
             /verbosity:minimal
