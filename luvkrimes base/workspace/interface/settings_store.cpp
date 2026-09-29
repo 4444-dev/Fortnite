@@ -90,7 +90,11 @@ bool Load(menu::Settings& settings) {
 	}
 
 	int menuKey = settings.menu_key;
-	if (config.TryGetInt("menu.key", menuKey)) {
+	if (
+		config.TryGetInt("menu.key", menuKey) &&
+		menuKey >= ImGuiKey_NamedKey_BEGIN &&
+		menuKey < ImGuiKey_NamedKey_END
+	) {
 		settings.menu_key = menuKey;
 	}
 
