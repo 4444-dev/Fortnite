@@ -46,6 +46,16 @@ jobs:
             /p:PreferredToolArchitecture="x64" `
             /verbosity:minimal
 
+      - name: Build loader
+        shell: pwsh
+        run: |
+          msbuild ".\loader\luvkrimes-loader.vcxproj" `
+            /m `
+            /p:Configuration="${{ matrix.configuration }}" `
+            /p:Platform="x64" `
+            /p:PreferredToolArchitecture="x64" `
+            /verbosity:minimal
+
       - name: Build tests
         shell: pwsh
         run: |
