@@ -59,10 +59,10 @@ Generated build output, Visual Studio state and local offset dumps are ignored b
 
 ## Settings and display handling
 
-Settings are loaded automatically from `%LOCALAPPDATA%\luvkrimes\settings.ini` and saved again on clean shutdown. The Config page also exposes explicit save/load/default controls.
+Settings are loaded automatically from `%LOCALAPPDATA%\luvkrimes\settings.ini` and saved again on clean shutdown. Writes use a temporary file and replacement step so an interrupted write is less likely to leave a partially written settings file. The Config page also exposes explicit save/load/default controls.
 
 The overlay window is DPI-aware and spans the Windows virtual desktop rather than only the primary display. Display-layout changes trigger a window resync and D3D11 swap-chain resize.
 
 ## Crash diagnostics
 
-Unhandled process crashes write a `MiniDumpNormal` file into a `crashdumps` folder next to the executable. These dumps are intended for local debugging and are not uploaded automatically.
+Unhandled process crashes write a `MiniDumpNormal` file into a `crashdumps` folder next to the executable. Runtime logs are also flushed to `%LOCALAPPDATA%\luvkrimes\logs\latest.log`, which helps correlate the dump with the last successful runtime stages. These files are intended for local debugging and are not uploaded automatically.
