@@ -318,8 +318,15 @@ namespace overlay {
 					pcfg );
 			}
 
-			if ( menu_open )
-				menu::render( );
+			if ( menu_open ) {
+				const auto players = Players.Snapshot( );
+				const menu::RuntimeStatus status {
+					Players.World( ) != nullptr,
+					Camera.Valid( ),
+					static_cast< int >( players.size( ) )
+				};
+				menu::render( status );
+			}
 
 			ImGui::Render( );
 
