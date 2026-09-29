@@ -19,9 +19,15 @@ namespace menu {
 		float accent[ 4 ]         = { 150 / 255.0f, 90 / 255.0f, 220 / 255.0f, 1.0f };
 	};
 
+	struct RuntimeStatus {
+		bool world_valid = false;
+		bool camera_valid = false;
+		int player_count = 0;
+	};
+
 	inline Settings cfg {};
 
 	void setup( );
-	void render( );
+	void render( const RuntimeStatus& status );
 
 }
