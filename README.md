@@ -17,7 +17,7 @@ Open `luvkrimes base.slnx`, select `Debug | x64` or `Release | x64`, then build 
 - `workspace/driver` — low-level device/process interface
 - `workspace/game/cache` — cached runtime state
 - `workspace/game/features` — rendering-facing feature logic
-- `workspace/interface` — Win32/D3D11/ImGui overlay and menu
+- `workspace/interface` — Win32/D3D11/ImGui layer, split into window, renderer, runtime loop and menu
 - `workspace/util` — shared utilities
 - `thirdparty/imgui` — Dear ImGui sources
 
