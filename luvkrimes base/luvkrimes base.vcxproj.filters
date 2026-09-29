@@ -26,10 +26,7 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="workspace\driver\driver_um_lib.cpp">
-      <Filter>Source Files\driver</Filter>
-    </ClCompile>
-    <ClCompile Include="workspace\interface\interface.cpp">
+<ClCompile Include="workspace\interface\interface.cpp">
       <Filter>Source Files\interface</Filter>
     </ClCompile>
     <ClCompile Include="workspace\interface\menu.cpp">
@@ -72,12 +69,7 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
-  <ItemGroup>
-    <MASM Include="workspace\driver\nmi_restoring_assembly.asm">
-      <Filter>Source Files\driver</Filter>
-    </MASM>
-  </ItemGroup>
-  <ItemGroup>
+<ItemGroup>
     <ClInclude Include="includes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
