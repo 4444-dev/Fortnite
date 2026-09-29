@@ -30,12 +30,15 @@ public:
 
 	void BeginFrame();
 	[[nodiscard]] bool EndFrame();
+	[[nodiscard]] bool Resize(UINT width, UINT height);
 
 	[[nodiscard]] ImFont* EspFont() const noexcept;
 	[[nodiscard]] float Fps() const noexcept;
 	[[nodiscard]] bool IsReady() const noexcept;
 
 private:
+	[[nodiscard]] bool CreateRenderTarget();
+
 	Microsoft::WRL::ComPtr<ID3D11Device> m_Device;
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_DeviceContext;
 	Microsoft::WRL::ComPtr<IDXGISwapChain> m_SwapChain;
