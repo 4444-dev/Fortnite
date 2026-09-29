@@ -227,6 +227,9 @@ namespace Driver {
 		mouse_request.x = x;
 		mouse_request.y = y;
 		mouse_request.button_flags = button_flags;
+#if defined(_MSC_VER)
+#pragma warning(suppress : 4244) // Legacy request ABI stores this field as ULONG.
+#endif
 		mouse_request.ExtraInformation = extraInfo;
 
 		IO_STATUS_BLOCK iosb{};
