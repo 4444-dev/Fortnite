@@ -4,4 +4,5 @@
   </Configurations>
   <Project Path="luvkrimes base/luvkrimes base.vcxproj" Id="929f7d2c-0577-436b-871f-ec6d73958b7b" />
   <Project Path="tests/luvkrimes-tests.vcxproj" Id="5B29FE73-70EF-4C96-A8D1-B9BB3374E301" />
+  <Project Path="loader/luvkrimes-loader.vcxproj" Id="8F741397-06DB-49B6-8A6E-43AD87694C11" />
 </Solution>
