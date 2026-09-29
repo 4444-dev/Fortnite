@@ -25,10 +25,21 @@ public:
 
 	[[nodiscard]] HWND Handle() const noexcept;
 	[[nodiscard]] bool PumpMessages() const;
+	[[nodiscard]] bool SyncToVirtualDesktop();
+	[[nodiscard]] SIZE ClientSize() const noexcept;
+	[[nodiscard]] float DpiScale() const noexcept;
+
 	void SetClickThrough(bool enabled) const;
 
 private:
-	static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+	static LRESULT CALLBACK WndProc(
+		HWND hwnd,
+		UINT message,
+		WPARAM wparam,
+		LPARAM lparam
+	);
+
+	[[nodiscard]] static RECT VirtualDesktopBounds() noexcept;
 
 	HWND m_Hwnd = nullptr;
 	HINSTANCE m_Instance = nullptr;
