@@ -3,6 +3,7 @@
 #include <includes.hpp>
 
 #include <Windows.h>
+#include <winioctl.h>
 #include <TlHelp32.h>
 #include <cstdint>
 #include "intrin.h"
