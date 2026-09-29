@@ -91,15 +91,20 @@
     <ClCompile Include="workspace\game\cache\camera.cpp" />
     <ClCompile Include="workspace\game\features\player\player.cpp" />
     <ClCompile Include="workspace\interface\interface.cpp" />
+    <ClCompile Include="workspace\interface\input.cpp" />
     <ClCompile Include="workspace\interface\renderer.cpp" />
+    <ClCompile Include="workspace\interface\settings_store.cpp" />
     <ClCompile Include="workspace\interface\window.cpp" />
     <ClCompile Include="workspace\interface\menu.cpp" />
+    <ClCompile Include="workspace\util\config\kv_config.cpp" />
+    <ClCompile Include="workspace\util\crash\crash_handler.cpp" />
     <ClCompile Include="workspace\util\logger\logger.cpp" />
     <ClCompile Include="thirdparty\imgui\imgui.cpp">
       <WarningLevel>Level3</WarningLevel>
     </ClCompile>
     <ClCompile Include="thirdparty\imgui\imgui_demo.cpp">
       <WarningLevel>Level3</WarningLevel>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="thirdparty\imgui\imgui_draw.cpp">
       <WarningLevel>Level3</WarningLevel>
@@ -133,9 +138,13 @@
     <ClInclude Include="workspace\game\cache\camera.hpp" />
     <ClInclude Include="workspace\game\features\player\player.hpp" />
     <ClInclude Include="workspace\interface\interface.hpp" />
+    <ClInclude Include="workspace\interface\input.hpp" />
     <ClInclude Include="workspace\interface\renderer.hpp" />
+    <ClInclude Include="workspace\interface\settings_store.hpp" />
     <ClInclude Include="workspace\interface\window.hpp" />
     <ClInclude Include="workspace\interface\menu.hpp" />
+    <ClInclude Include="workspace\util\config\kv_config.hpp" />
+    <ClInclude Include="workspace\util\crash\crash_handler.hpp" />
     <ClInclude Include="workspace\util\logger\logger.hpp" />
     <ClInclude Include="thirdparty\imgui\imconfig.h" />
     <ClInclude Include="thirdparty\imgui\imgui.h" />
