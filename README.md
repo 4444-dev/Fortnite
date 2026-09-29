@@ -22,16 +22,22 @@ GitHub Actions builds both:
 
 on pull requests targeting `main`, and on pushes to `main`.
 
+The same matrix builds and executes the standalone configuration tests in `tests/`.
+
 ## Runtime architecture
 
 - `main.cpp` — application startup and shutdown
 - `workspace/driver` — low-level device/process interface
 - `workspace/game/cache` — cached runtime state
 - `workspace/game/features` — rendering-facing feature logic
-- `workspace/interface/window.*` — Win32 window lifetime
-- `workspace/interface/renderer.*` — D3D11 + ImGui lifetime
-- `workspace/interface/interface.cpp` — runtime/input orchestration
+- `workspace/interface/window.*` — DPI-aware Win32 virtual-desktop window lifetime
+- `workspace/interface/renderer.*` — D3D11 + ImGui lifetime and swap-chain resizing
+- `workspace/interface/input.*` — keyboard/mouse input routing
+- `workspace/interface/settings_store.*` — persistent local settings
+- `workspace/interface/interface.cpp` — runtime orchestration
 - `workspace/interface/menu.*` — menu and diagnostics
+- `workspace/util/config` — generic key/value configuration parser
+- `workspace/util/crash` — local Windows minidump crash diagnostics
 - `workspace/util` — shared utilities
 - `thirdparty/imgui` — Dear ImGui sources
 
@@ -49,3 +55,14 @@ The Config page exposes runtime health and timing information:
 - player-cache time
 
 Generated build output, Visual Studio state and local offset dumps are ignored by Git.
+
+
+## Settings and display handling
+
+Settings are loaded automatically from `%LOCALAPPDATA%\luvkrimes\settings.ini` and saved again on clean shutdown. The Config page also exposes explicit save/load/default controls.
+
+The overlay window is DPI-aware and spans the Windows virtual desktop rather than only the primary display. Display-layout changes trigger a window resync and D3D11 swap-chain resize.
+
+## Crash diagnostics
+
+Unhandled process crashes write a `MiniDumpNormal` file into a `crashdumps` folder next to the executable. These dumps are intended for local debugging and are not uploaded automatically.
