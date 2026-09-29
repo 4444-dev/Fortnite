@@ -2,6 +2,7 @@
 
 #include <charconv>
 #include <cstdlib>
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -144,7 +145,10 @@ bool KeyValueConfig::TryGetFloat(std::string_view key, float& value) const {
 
 	char* end = nullptr;
 	const float parsed = std::strtof(raw->c_str(), &end);
-	if (end != raw->c_str() + raw->size()) {
+	if (
+		end != raw->c_str() + raw->size() ||
+		!std::isfinite(parsed)
+	) {
 		return false;
 	}
 
