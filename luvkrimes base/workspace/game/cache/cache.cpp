@@ -456,6 +456,11 @@ std::vector<CachedPlayer> PlayerCache::Snapshot( ) const {
 	return m_Players;
 }
 
+std::size_t PlayerCache::Count( ) const {
+	std::lock_guard<std::mutex> lk( m_PlayerMutex );
+	return m_Players.size( );
+}
+
 void PlayerCache::SetCameraLocation( const FVector& CameraLocation ) {
 	m_CamX.store( CameraLocation.X, std::memory_order_relaxed );
 	m_CamY.store( CameraLocation.Y, std::memory_order_relaxed );
