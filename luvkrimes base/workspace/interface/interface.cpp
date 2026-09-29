@@ -79,7 +79,7 @@ void FeedKeyboard() {
 			MapVirtualKeyW(vk, MAPVK_VK_TO_VSC),
 			keyboardState,
 			characters,
-			static_cast<int>(std::size(characters)),
+			static_cast<int>(_countof(characters)),
 			0
 		);
 
