@@ -1,6 +1,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 
 #include <workspace/interface/menu.hpp>
+#include <workspace/interface/settings_store.hpp>
 #include <thirdparty/imgui/imgui_internal.h>
 
 #include <Windows.h>
@@ -421,6 +422,10 @@ namespace {
 		keybind( "menu key", &cfg.menu_key );
 		checkbox( "accent color", nullptr, cfg.accent );
 		ImGui::Dummy( ImVec2( 0, 6 ) );
+		if ( button( "save settings" ) )
+			( void )app_settings::Save( cfg );
+		if ( button( "load settings" ) )
+			( void )app_settings::Load( cfg );
 		if ( button( "restore defaults" ) )
 			cfg = cfg_default;
 		end_group( );
@@ -460,6 +465,10 @@ namespace {
 		char playersMs[ 24 ] {};
 		std::snprintf( playersMs, sizeof( playersMs ), "%.3f ms", status.players_ms );
 		info( "player cache", playersMs );
+
+		char dpiScale[ 24 ] {};
+		std::snprintf( dpiScale, sizeof( dpiScale ), "%.2fx", status.dpi_scale );
+		info( "dpi", dpiScale );
 		end_group( );
 	}
 
