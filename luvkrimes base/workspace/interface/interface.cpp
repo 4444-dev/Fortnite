@@ -106,36 +106,6 @@ namespace overlay {
 		return rect;
 	}
 
-	HWND hijack( ) {
-		auto hwnd = FindWindowA( "Chrome_WidgetWin_1", "Discord Overlay" );
-		const ULONGLONG deadline = GetTickCount64( ) + 5000;
-		while ( !hwnd && GetTickCount64( ) < deadline ) {
-			hwnd = FindWindowA( "Chrome_WidgetWin_1", "Discord Overlay" );
-			if ( !hwnd )
-				Sleep( 100 );
-		}
-		if ( !hwnd )
-			return nullptr;
-
-		RECT rect = get_client_area_and_size( hwnd );
-		SetWindowPos( hwnd, nullptr, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER );
-
-		MARGINS window_margin { -1 };
-		DwmExtendFrameIntoClientArea( hwnd, &window_margin );
-		SetLayeredWindowAttributes( hwnd, 0, 255, LWA_ALPHA );
-
-		UpdateWindow( hwnd );
-		ShowWindow( hwnd, SW_SHOW );
-
-		const LONG_PTR ex_style = GetWindowLongPtrW( hwnd, GWL_EXSTYLE );
-		SetWindowLongPtrW( hwnd, GWL_EXSTYLE, ex_style | WS_EX_LAYERED | WS_EX_NOACTIVATE );
-
-		SetWindowPos( hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
-		set_click_through( hwnd, false );
-
-		return hwnd;
-	}
-
 	bool setup_d3d( HWND hwnd ) {
 		DXGI_SWAP_CHAIN_DESC desc { };
 		ZeroMemory( &desc, sizeof( desc ) );
@@ -365,20 +335,25 @@ namespace overlay {
 	}
 
 	bool run( PlayerCache& Players, CameraCache& Camera ) {
-		resources.hwnd = hijack( );
-		if ( !resources.hwnd )
-			resources.hwnd = create_fallback_window( );
+		resources.hwnd = create_fallback_window( );
 		if ( !resources.hwnd )
 			return false;
 
 		if ( !setup_d3d( resources.hwnd ) ) {
+			DestroyWindow( resources.hwnd );
+			resources.hwnd = nullptr;
 			shutdown_d3d( );
 			return false;
 		}
 
 		loop( Players, Camera );
 
+		HWND window = resources.hwnd;
 		shutdown_d3d( );
+
+		if ( window && IsWindow( window ) )
+			DestroyWindow( window );
+
 		return true;
 	}
 
