@@ -435,6 +435,10 @@ namespace {
 		char players[ 16 ] {};
 		std::snprintf( players, sizeof( players ), "%d", status.player_count );
 		info( "players", players );
+
+		char fps[ 16 ] {};
+		std::snprintf( fps, sizeof( fps ), "%.0f", status.fps );
+		info( "fps", fps );
 		end_group( );
 	}
 
