@@ -23,6 +23,7 @@ namespace menu {
 		bool world_valid = false;
 		bool camera_valid = false;
 		int player_count = 0;
+		float fps = 0.0f;
 	};
 
 	inline Settings cfg {};
