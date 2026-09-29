@@ -7,8 +7,8 @@
 #include <thirdparty/imgui/backends/imgui_impl_dx11.h>
 #include <thirdparty/imgui/backends/imgui_impl_win32.h>
 #include <workspace/interface/menu.hpp>
-#include <Uxtheme.h>
 #include <dwmapi.h>
+#include <workspace/util/logger/logger.hpp>
 
 #pragma comment( lib, "d3d11.lib" )
 #pragma comment( lib, "dxgi.lib" )
@@ -169,8 +169,18 @@ namespace overlay {
 		if ( !g_EspFont )
 			g_EspFont = io.Fonts->Fonts.back( );
 
-		ImGui_ImplWin32_Init( hwnd );
-		ImGui_ImplDX11_Init( resources.device, resources.device_context );
+		if ( !ImGui_ImplWin32_Init( hwnd ) ) {
+			logger::Log( "[overlay] ImGui Win32 backend initialization failed" );
+			ImGui::DestroyContext( );
+			return false;
+		}
+
+		if ( !ImGui_ImplDX11_Init( resources.device, resources.device_context ) ) {
+			logger::Log( "[overlay] ImGui DX11 backend initialization failed" );
+			ImGui_ImplWin32_Shutdown( );
+			ImGui::DestroyContext( );
+			return false;
+		}
 
 		resources.hwnd = hwnd;
 		return true;
@@ -323,7 +333,8 @@ namespace overlay {
 				const menu::RuntimeStatus status {
 					Players.World( ) != nullptr,
 					Camera.Valid( ),
-					static_cast< int >( players.size( ) )
+					static_cast< int >( players.size( ) ),
+					ImGui::GetIO( ).Framerate
 				};
 				menu::render( status );
 			}
@@ -333,7 +344,11 @@ namespace overlay {
 			resources.device_context->OMSetRenderTargets( 1, &resources.render_target_view, nullptr );
 			resources.device_context->ClearRenderTargetView( resources.render_target_view, clear_color );
 			ImGui_ImplDX11_RenderDrawData( ImGui::GetDrawData( ) );
-			resources.swap_chain->Present( 0, 0 );
+			const HRESULT presentResult = resources.swap_chain->Present( 0, 0 );
+			if ( FAILED( presentResult ) ) {
+				logger::Log( "[overlay] swap-chain present failed (hr=0x%08lX)", static_cast<unsigned long>( presentResult ) );
+				break;
+			}
 		}
 
 		ImGui_ImplDX11_Shutdown( );
