@@ -8,6 +8,12 @@
 using namespace std::chrono_literals;
 
 namespace {
+	u64 ElapsedMicros( const std::chrono::steady_clock::time_point Start ) {
+		const auto End = std::chrono::steady_clock::now( );
+		const auto Value = std::chrono::duration_cast<std::chrono::microseconds>( End - Start ).count( );
+		return Value > 0 ? static_cast<u64>( Value ) : 0;
+	}
+
 	enum class EngineStage : u8 {
 		Ok,
 		NoImageBase,
@@ -451,14 +457,22 @@ uptr PlayerCache::ImageBase( ) const { return m_ImageBase.load( std::memory_orde
 UWorld* PlayerCache::World( ) const { return m_World.load( std::memory_order_acquire ); }
 u8 PlayerCache::LocalTeamIndex( ) const { return m_LocalTeamIndex.load( std::memory_order_relaxed ); }
 
-std::vector<CachedPlayer> PlayerCache::Snapshot( ) const {
-	std::lock_guard<std::mutex> lk( m_PlayerMutex );
-	return m_Players;
+PlayerSnapshotView PlayerCache::Snapshot( ) const {
+	const u8 Active = m_ActivePlayerBuffer.load( std::memory_order_acquire ) & 1U;
+	return PlayerSnapshotView(
+		m_PlayerBuffers [ Active ],
+		m_PlayerBufferMutexes [ Active ]
+	);
 }
 
-std::size_t PlayerCache::Count( ) const {
-	std::lock_guard<std::mutex> lk( m_PlayerMutex );
-	return m_Players.size( );
+PlayerCacheStats PlayerCache::Stats( ) const {
+	PlayerCacheStats Stats {};
+	Stats.EngineMs = static_cast<double>( m_EngineMicros.load( std::memory_order_relaxed ) ) / 1000.0;
+	Stats.ActorsMs = static_cast<double>( m_ActorsMicros.load( std::memory_order_relaxed ) ) / 1000.0;
+	Stats.PlayersMs = static_cast<double>( m_PlayersMicros.load( std::memory_order_relaxed ) ) / 1000.0;
+	Stats.ActorCount = static_cast<std::size_t>( m_ActorCount.load( std::memory_order_relaxed ) );
+	Stats.PlayerCount = static_cast<std::size_t>( m_PlayerCount.load( std::memory_order_relaxed ) );
+	return Stats;
 }
 
 void PlayerCache::SetCameraLocation( const FVector& CameraLocation ) {
@@ -478,36 +492,52 @@ void PlayerCache::Start( ) {
 void PlayerCache::Stop( ) {
 	if ( !m_Running.exchange( false ) )
 		return;
+
 	if ( m_EngineThread.joinable( ) ) m_EngineThread.join( );
 	if ( m_ActorsThread.joinable( ) ) m_ActorsThread.join( );
 	if ( m_PlayersThread.joinable( ) ) m_PlayersThread.join( );
 
-	std::lock_guard<std::mutex> a( m_ActorMutex );
-	std::lock_guard<std::mutex> p( m_PlayerMutex );
-	m_Actors.clear( );
-	m_Players.clear( );
+	{
+		std::lock_guard<std::mutex> Lock( m_ActorMutex );
+		m_Actors.clear( );
+	}
+
+	for ( std::size_t Index = 0; Index < m_PlayerBuffers.size( ); ++Index ) {
+		std::unique_lock<std::shared_mutex> Lock( m_PlayerBufferMutexes [ Index ] );
+		m_PlayerBuffers [ Index ].clear( );
+	}
+
+	m_ActivePlayerBuffer.store( 0, std::memory_order_release );
+	m_ActorCount.store( 0, std::memory_order_relaxed );
+	m_PlayerCount.store( 0, std::memory_order_relaxed );
 }
 
 void PlayerCache::EngineLoop( ) {
 	while ( m_Running.load( std::memory_order_acquire ) ) {
+		const auto Start = std::chrono::steady_clock::now( );
 		try { ResolveEngineSnapshot( ); }
 		catch ( ... ) {}
+		m_EngineMicros.store( ElapsedMicros( Start ), std::memory_order_relaxed );
 		std::this_thread::sleep_for( 2ms );
 	}
 }
 
 void PlayerCache::ActorsLoop( ) {
 	while ( m_Running.load( std::memory_order_acquire ) ) {
+		const auto Start = std::chrono::steady_clock::now( );
 		try { ScanActors( ); }
 		catch ( ... ) {}
+		m_ActorsMicros.store( ElapsedMicros( Start ), std::memory_order_relaxed );
 		std::this_thread::sleep_for( 100ms );
 	}
 }
 
 void PlayerCache::PlayersLoop( ) {
 	while ( m_Running.load( std::memory_order_acquire ) ) {
+		const auto Start = std::chrono::steady_clock::now( );
 		try { ResolvePlayers( ); }
 		catch ( ... ) {}
+		m_PlayersMicros.store( ElapsedMicros( Start ), std::memory_order_relaxed );
 		std::this_thread::sleep_for( 4ms );
 	}
 }
@@ -721,8 +751,14 @@ void PlayerCache::ScanActors( ) {
 	}
 
 	if ( !found.empty( ) ) {
-		std::lock_guard<std::mutex> lk( m_ActorMutex );
-		m_Actors = std::move( found );
+		{
+			std::lock_guard<std::mutex> Lock( m_ActorMutex );
+			m_Actors = std::move( found );
+			m_ActorCount.store(
+				static_cast<u32>( m_Actors.size( ) ),
+				std::memory_order_relaxed
+			);
+		}
 		return;
 	}
 
@@ -766,8 +802,30 @@ void PlayerCache::ScanActors( ) {
 		return;
 	}
 
-	std::lock_guard<std::mutex> lk( m_ActorMutex );
-	m_Actors = std::move( found );
+	{
+		std::lock_guard<std::mutex> Lock( m_ActorMutex );
+		m_Actors = std::move( found );
+		m_ActorCount.store(
+			static_cast<u32>( m_Actors.size( ) ),
+			std::memory_order_relaxed
+		);
+	}
+}
+
+void PlayerCache::PublishPlayers( std::vector<CachedPlayer>&& Players ) {
+	const u8 Active = m_ActivePlayerBuffer.load( std::memory_order_acquire ) & 1U;
+	const u8 WriteIndex = Active ^ 1U;
+
+	{
+		std::unique_lock<std::shared_mutex> Lock( m_PlayerBufferMutexes [ WriteIndex ] );
+		m_PlayerBuffers [ WriteIndex ] = std::move( Players );
+		m_PlayerCount.store(
+			static_cast<u32>( m_PlayerBuffers [ WriteIndex ].size( ) ),
+			std::memory_order_relaxed
+		);
+	}
+
+	m_ActivePlayerBuffer.store( WriteIndex, std::memory_order_release );
 }
 
 void PlayerCache::ResolvePlayers( ) {
@@ -778,8 +836,7 @@ void PlayerCache::ResolvePlayers( ) {
 	}
 
 	if ( actors.empty( ) ) {
-		std::lock_guard<std::mutex> lk( m_PlayerMutex );
-		m_Players.clear( );
+		PublishPlayers( {} );
 		return;
 	}
 
@@ -810,8 +867,7 @@ void PlayerCache::ResolvePlayers( ) {
 	if ( !anyLocal && resolved.size( ) == 1 )
 		resolved [ 0 ].bIsLocal = true;
 
-	std::lock_guard<std::mutex> lk( m_PlayerMutex );
-	m_Players = std::move( resolved );
+	PublishPlayers( std::move( resolved ) );
 }
 
 CachedPlayer PlayerCache::ResolveOne( AFortPlayerPawnAthena* Pawn, const FVector& CameraLoc ) const {
