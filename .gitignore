@@ -1,6 +1,16 @@
 .vs/
+.vscode/
 x64/
 Debug/
 Release/
+out/
+build/
 *.user
 *.suo
+*.VC.db
+*.VC.VC.opendb
+*.pdb
+*.obj
+*.ilk
+*.log
+offsets_dump.txt
