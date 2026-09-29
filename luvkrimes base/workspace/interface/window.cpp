@@ -24,10 +24,26 @@ Window::~Window() {
 	Destroy();
 }
 
+RECT Window::VirtualDesktopBounds() noexcept {
+	const int left = GetSystemMetrics(SM_XVIRTUALSCREEN);
+	const int top = GetSystemMetrics(SM_YVIRTUALSCREEN);
+	const int width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+	const int height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+
+	return RECT{
+		left,
+		top,
+		left + width,
+		top + height
+	};
+}
+
 bool Window::Create() {
 	if (m_Hwnd) {
 		return true;
 	}
+
+	ImGui_ImplWin32_EnableDpiAwareness();
 
 	m_Instance = GetModuleHandleW(nullptr);
 	if (!m_Instance) {
@@ -55,16 +71,17 @@ bool Window::Create() {
 		m_OwnsClass = true;
 	}
 
-	const int width = GetSystemMetrics(SM_CXSCREEN);
-	const int height = GetSystemMetrics(SM_CYSCREEN);
+	const RECT bounds = VirtualDesktopBounds();
+	const int width = bounds.right - bounds.left;
+	const int height = bounds.bottom - bounds.top;
 
 	m_Hwnd = CreateWindowExW(
 		WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
 		kWindowClassName,
 		kWindowTitle,
 		WS_POPUP,
-		0,
-		0,
+		bounds.left,
+		bounds.top,
 		width,
 		height,
 		nullptr,
@@ -90,6 +107,15 @@ bool Window::Create() {
 
 	ShowWindow(m_Hwnd, SW_SHOW);
 	UpdateWindow(m_Hwnd);
+
+	logger::Log(
+		"[window] virtual desktop %dx%d at (%d,%d), dpi %.2f",
+		width,
+		height,
+		bounds.left,
+		bounds.top,
+		static_cast<double>(DpiScale())
+	);
 	return true;
 }
 
@@ -125,6 +151,75 @@ bool Window::PumpMessages() const {
 	return true;
 }
 
+bool Window::SyncToVirtualDesktop() {
+	if (!m_Hwnd) {
+		return false;
+	}
+
+	const RECT expected = VirtualDesktopBounds();
+	RECT current{};
+	if (!GetWindowRect(m_Hwnd, &current)) {
+		return false;
+	}
+
+	if (
+		current.left == expected.left &&
+		current.top == expected.top &&
+		current.right == expected.right &&
+		current.bottom == expected.bottom
+	) {
+		return false;
+	}
+
+	const int width = expected.right - expected.left;
+	const int height = expected.bottom - expected.top;
+
+	if (!SetWindowPos(
+		m_Hwnd,
+		nullptr,
+		expected.left,
+		expected.top,
+		width,
+		height,
+		SWP_NOACTIVATE | SWP_NOZORDER
+	)) {
+		logger::Log("[window] virtual desktop resize failed (%lu)", GetLastError());
+		return false;
+	}
+
+	logger::Log(
+		"[window] display layout changed -> %dx%d at (%d,%d)",
+		width,
+		height,
+		expected.left,
+		expected.top
+	);
+	return true;
+}
+
+SIZE Window::ClientSize() const noexcept {
+	SIZE size{};
+	if (!m_Hwnd) {
+		return size;
+	}
+
+	RECT client{};
+	if (GetClientRect(m_Hwnd, &client)) {
+		size.cx = client.right - client.left;
+		size.cy = client.bottom - client.top;
+	}
+	return size;
+}
+
+float Window::DpiScale() const noexcept {
+	if (!m_Hwnd) {
+		return 1.0f;
+	}
+
+	const float scale = ImGui_ImplWin32_GetDpiScaleForHwnd(m_Hwnd);
+	return scale > 0.0f ? scale : 1.0f;
+}
+
 void Window::SetClickThrough(bool enabled) const {
 	if (!m_Hwnd) {
 		return;
@@ -146,7 +241,10 @@ void Window::SetClickThrough(bool enabled) const {
 }
 
 LRESULT CALLBACK Window::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
-	if (ImGui::GetCurrentContext() && ImGui_ImplWin32_WndProcHandler(hwnd, message, wparam, lparam)) {
+	if (
+		ImGui::GetCurrentContext() &&
+		ImGui_ImplWin32_WndProcHandler(hwnd, message, wparam, lparam)
+	) {
 		return TRUE;
 	}
 
