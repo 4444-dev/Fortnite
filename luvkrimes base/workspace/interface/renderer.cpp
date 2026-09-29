@@ -44,7 +44,7 @@ bool Renderer::Initialize(HWND hwnd) {
 		nullptr,
 		0,
 		levels,
-		static_cast<UINT>(std::size(levels)),
+		static_cast<UINT>(_countof(levels)),
 		D3D11_SDK_VERSION,
 		&desc,
 		m_SwapChain.GetAddressOf(),
