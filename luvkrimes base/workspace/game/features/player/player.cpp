@@ -28,7 +28,6 @@ namespace {
 		const float headX = static_cast<float>( head.X );
 		const float headY = static_cast<float>( head.Y );
 		const float pelvisX = static_cast<float>( pelvis.X );
-		const float pelvisY = static_cast<float>( pelvis.Y );
 		const float leftFootX = static_cast<float>( leftFoot.X );
 		const float leftFootY = static_cast<float>( leftFoot.Y );
 		const float rightFootX = static_cast<float>( rightFoot.X );
