@@ -1,5 +1,6 @@
 #include <includes.hpp>
 #include <workspace/util/logger/logger.hpp>
+#include <workspace/util/crash/crash_handler.hpp>
 
 #include <chrono>
 #include <thread>
@@ -89,6 +90,7 @@ void PressKeyToExit() {
 } // namespace
 
 i32 main(i32, char**) {
+	crash_handler::Install();
 	logger::Init();
 	SetConsoleTitleW(L"luvkrimes base");
 
