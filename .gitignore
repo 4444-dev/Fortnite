@@ -16,3 +16,6 @@ build/
 offsets_dump.txt
 bin/
 obj/
+thirdparty/keyauth/
+loader/bin/
+loader/obj/
