@@ -2,6 +2,7 @@
 #include <array>
 #include <atomic>
 #include <mutex>
+#include <cstddef>
 #include <string>
 #include <thread>
 #include <vector>
@@ -66,6 +67,7 @@ public:
 	void SetCameraLocation( const FVector& CameraLocation );
 
 	std::vector<CachedPlayer> Snapshot( ) const;
+	std::size_t Count( ) const;
 
 private:
 	void EngineLoop( );
