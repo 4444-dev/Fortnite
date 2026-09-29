@@ -414,7 +414,7 @@ namespace {
 		end_group( );
 	}
 
-	void page_config( ImVec2 avail ) {
+	void page_config( ImVec2 avail, const menu::RuntimeStatus& status ) {
 		const float col_w = ImFloor( ( avail.x - 12.0f ) * 0.5f );
 
 		begin_group( "menu", ImVec2( col_w, avail.y ) );
@@ -430,6 +430,11 @@ namespace {
 		begin_group( "info", ImVec2( avail.x - col_w - 12.0f, avail.y ) );
 		info( "build", "1.0" );
 		info( "game", "fortnite" );
+		info( "world", status.world_valid ? "ok" : "invalid" );
+		info( "camera", status.camera_valid ? "ok" : "invalid" );
+		char players[ 16 ] {};
+		std::snprintf( players, sizeof( players ), "%d", status.player_count );
+		info( "players", players );
 		end_group( );
 	}
 
@@ -490,7 +495,7 @@ void menu::setup( ) {
 	apply_style( );
 }
 
-void menu::render( ) {
+void menu::render( const RuntimeStatus& status ) {
 	const ImVec2 size( 560.0f, 380.0f );
 
 	ImGui::SetNextWindowPos( ImVec2( 60.0f, 60.0f ), ImGuiCond_FirstUseEver );
@@ -534,7 +539,7 @@ void menu::render( ) {
 		ImGui::SetCursorPos( ImVec2( tabs_x, content_y ) );
 		ImGui::BeginGroup( );
 		if ( tab == 0 ) page_visuals( avail );
-		else            page_config ( avail );
+		else            page_config ( avail, status );
 		ImGui::EndGroup( );
 	}
 	ImGui::End( );
