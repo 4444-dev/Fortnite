@@ -22,8 +22,13 @@ namespace menu {
 	struct RuntimeStatus {
 		bool world_valid = false;
 		bool camera_valid = false;
+		int actor_count = 0;
 		int player_count = 0;
 		float fps = 0.0f;
+		float frame_ms = 0.0f;
+		float engine_ms = 0.0f;
+		float actors_ms = 0.0f;
+		float players_ms = 0.0f;
 	};
 
 	inline Settings cfg {};
