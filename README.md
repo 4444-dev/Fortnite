@@ -66,3 +66,20 @@ The overlay window is DPI-aware and spans the Windows virtual desktop rather tha
 ## Crash diagnostics
 
 Unhandled process crashes write a `MiniDumpNormal` file into a `crashdumps` folder next to the executable. Runtime logs are also flushed to `%LOCALAPPDATA%\luvkrimes\logs\latest.log`, which helps correlate the dump with the last successful runtime stages. These files are intended for local debugging and are not uploaded automatically.
+
+
+## Loader and authentication
+
+A separate `loader/luvkrimes-loader.vcxproj` project provides a dark ImGui authentication window using KeyAuth API 1.3.
+
+The KeyAuth SDK is not vendored into this repository. The loader's pre-build step runs `scripts/bootstrap-keyauth.ps1`, which fetches the official KeyAuth 1.3 C++ library at pinned commit `486c83e6259f508ba0396f3156e50792a34a4576`. The optional upstream `Security.hpp` and `killEmulator.hpp` modules are removed after bootstrap, leaving normal authentication/session behavior without optional anti-analysis or emulator-killing logic.
+
+Loader configuration:
+- application: `Timocod18ytb's Application`
+- owner ID: `ZOhORJsXc1`
+- version: `1.0`
+- API: `https://keyauth.win/api/1.3/`
+
+The loader supports license-key authentication, 60-second session revalidation, and optional remembered-license storage using Windows DPAPI. Remembered license material is encrypted for the current Windows account and is not stored as plaintext.
+
+For a generic post-authentication launch, set the `LUVKRIMES_TARGET` environment variable to the full path of the signed executable you want the loader to start. No injection, process hiding, anti-debugging, VM detection, or driver concealment is performed by the loader.
