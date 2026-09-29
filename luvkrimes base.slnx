@@ -1,7 +1,6 @@
 <Solution>
   <Configurations>
     <Platform Name="x64" />
-    <Platform Name="x86" />
   </Configurations>
   <Project Path="luvkrimes base/luvkrimes base.vcxproj" Id="929f7d2c-0577-436b-871f-ec6d73958b7b" />
 </Solution>
