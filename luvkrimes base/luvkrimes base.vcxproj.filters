@@ -46,6 +46,8 @@
     <ClCompile Include="workspace\game\cache\camera.cpp"><Filter>Source Files\game</Filter></ClCompile>
     <ClCompile Include="workspace\game\features\player\player.cpp"><Filter>Source Files\game</Filter></ClCompile>
     <ClCompile Include="workspace\interface\interface.cpp"><Filter>Source Files\interface</Filter></ClCompile>
+    <ClCompile Include="workspace\interface\renderer.cpp"><Filter>Source Files\interface</Filter></ClCompile>
+    <ClCompile Include="workspace\interface\window.cpp"><Filter>Source Files\interface</Filter></ClCompile>
     <ClCompile Include="workspace\interface\menu.cpp"><Filter>Source Files\interface</Filter></ClCompile>
     <ClCompile Include="workspace\util\logger\logger.cpp"><Filter>Source Files\util</Filter></ClCompile>
     <ClCompile Include="thirdparty\imgui\imgui.cpp"><Filter>Source Files\thirdparty</Filter></ClCompile>
@@ -73,6 +75,8 @@
     <ClInclude Include="workspace\game\cache\camera.hpp"><Filter>Header Files\game</Filter></ClInclude>
     <ClInclude Include="workspace\game\features\player\player.hpp"><Filter>Header Files\game</Filter></ClInclude>
     <ClInclude Include="workspace\interface\interface.hpp"><Filter>Header Files\interface</Filter></ClInclude>
+    <ClInclude Include="workspace\interface\renderer.hpp"><Filter>Header Files\interface</Filter></ClInclude>
+    <ClInclude Include="workspace\interface\window.hpp"><Filter>Header Files\interface</Filter></ClInclude>
     <ClInclude Include="workspace\interface\menu.hpp"><Filter>Header Files\interface</Filter></ClInclude>
     <ClInclude Include="workspace\util\logger\logger.hpp"><Filter>Header Files\util</Filter></ClInclude>
     <ClInclude Include="thirdparty\imgui\imconfig.h"><Filter>Header Files\thirdparty</Filter></ClInclude>
