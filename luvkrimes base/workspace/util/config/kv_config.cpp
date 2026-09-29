@@ -3,6 +3,13 @@
 #include <charconv>
 #include <cstdlib>
 #include <cmath>
+
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <Windows.h>
+#endif
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -63,17 +70,46 @@ bool KeyValueConfig::Save(const std::filesystem::path& path) const {
 		}
 	}
 
-	std::ofstream output(path, std::ios::trunc);
-	if (!output) {
+	std::filesystem::path temporary = path;
+	temporary += ".tmp";
+
+	{
+		std::ofstream output(temporary, std::ios::trunc);
+		if (!output) {
+			return false;
+		}
+
+		output << "# luvkrimes settings\n";
+		for (const auto& [key, value] : m_Values) {
+			output << key << '=' << value << '\n';
+		}
+
+		output.flush();
+		if (!output.good()) {
+			output.close();
+			std::filesystem::remove(temporary, error);
+			return false;
+		}
+	}
+
+#if defined(_WIN32)
+	if (!MoveFileExW(
+		temporary.c_str(),
+		path.c_str(),
+		MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+	)) {
+		std::filesystem::remove(temporary, error);
 		return false;
 	}
-
-	output << "# luvkrimes settings\n";
-	for (const auto& [key, value] : m_Values) {
-		output << key << '=' << value << '\n';
+#else
+	std::filesystem::rename(temporary, path, error);
+	if (error) {
+		std::filesystem::remove(temporary, error);
+		return false;
 	}
+#endif
 
-	return output.good();
+	return true;
 }
 
 void KeyValueConfig::SetString(std::string key, std::string value) {
