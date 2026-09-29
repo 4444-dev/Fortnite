@@ -29,6 +29,7 @@ namespace menu {
 		float engine_ms = 0.0f;
 		float actors_ms = 0.0f;
 		float players_ms = 0.0f;
+		float dpi_scale = 1.0f;
 	};
 
 	inline Settings cfg {};
