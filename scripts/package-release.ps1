@@ -73,8 +73,14 @@ Set-Content -LiteralPath (Join-Path $stage "README.txt") -Value $readme -Encodin
 $portablePath = Join-Path $output ("Luvkrimes-Portable-" + $Version + ".zip")
 Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $portablePath -CompressionLevel Optimal
 
-$makensis = Get-Command "makensis.exe" -ErrorAction SilentlyContinue
-if (-not $makensis) {
+$makensisCommand = Get-Command "makensis.exe" -ErrorAction SilentlyContinue
+$makensisPath = if ($makensisCommand) {
+    $makensisCommand.Source
+} else {
+    ""
+}
+
+if ([string]::IsNullOrWhiteSpace($makensisPath)) {
     $candidates = @(
         "$env:ProgramFiles\NSIS\makensis.exe",
         "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
@@ -82,19 +88,19 @@ if (-not $makensis) {
 
     foreach ($candidate in $candidates) {
         if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
-            $makensis = Get-Item -LiteralPath $candidate
+            $makensisPath = $candidate
             break
         }
     }
 }
 
-if (-not $makensis) {
+if ([string]::IsNullOrWhiteSpace($makensisPath)) {
     throw "makensis.exe was not found. Install NSIS before packaging."
 }
 
 $installerScript = Join-Path $root "installer\luvkrimes.nsi"
 
-& $makensis.Source `
+& $makensisPath `
     "/DVERSION=$Version" `
     "/DSOURCEDIR=$stage" `
     "/DOUTDIR=$output" `
