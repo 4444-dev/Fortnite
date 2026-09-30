@@ -64,13 +64,22 @@ void SaveColor(
 } // namespace
 
 std::filesystem::path Path() {
+	return LocalAppDataPath() / L"Nexus" / L"settings.ini";
+}
+
+std::filesystem::path LegacyPath() {
 	return LocalAppDataPath() / L"luvkrimes" / L"settings.ini";
 }
 
 bool Load(menu::Settings& settings) {
 	util::KeyValueConfig config;
+	bool migrated = false;
+
 	if (!config.Load(Path())) {
-		return false;
+		if (!config.Load(LegacyPath())) {
+			return false;
+		}
+		migrated = true;
 	}
 
 	(void)config.TryGetBool("visuals.box", settings.box);
@@ -102,6 +111,11 @@ bool Load(menu::Settings& settings) {
 	LoadColor(config, "visuals.skeleton_color", settings.skeleton_color);
 	LoadColor(config, "visuals.snapline_color", settings.snapline_color);
 	LoadColor(config, "menu.accent", settings.accent);
+
+	if (migrated) {
+		(void)config.Save(Path());
+	}
+
 	return true;
 }
 
