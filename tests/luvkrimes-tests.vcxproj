@@ -81,9 +81,16 @@
 
   <ItemGroup>
     <ClCompile Include="config_tests.cpp" />
+    <ClCompile Include="loader_tests.cpp" />
+    <ClCompile Include="math_tests.cpp" />
     <ClCompile Include="..\loader\launch_target.cpp" />
     <ClCompile Include="..\loader\license_store.cpp" />
     <ClCompile Include="..\luvkrimes base\workspace\util\config\kv_config.cpp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ClInclude Include="test_common.hpp" />
+    <ClInclude Include="test_suites.hpp" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
