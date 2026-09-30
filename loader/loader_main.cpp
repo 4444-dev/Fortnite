@@ -1,9 +1,10 @@
-#include "keyauth_config.hpp"
 #include "license_store.hpp"
+#include "product_registry.hpp"
 
 #include <auth.hpp>
 
 #include <Windows.h>
+#include <windowsx.h>
 #include <d3d11.h>
 #include <dwmapi.h>
 
@@ -17,9 +18,11 @@
 #include <chrono>
 #include <cstring>
 #include <filesystem>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -36,8 +39,13 @@ namespace {
 
 constexpr wchar_t kClassName[] = L"LuvkrimesLoaderWindow";
 constexpr wchar_t kWindowTitle[] = L"luvkrimes loader";
-constexpr int kWindowWidth = 560;
-constexpr int kWindowHeight = 340;
+constexpr int kWindowWidth = 620;
+constexpr int kWindowHeight = 390;
+
+enum class Screen {
+	ProductSelect,
+	Authentication
+};
 
 enum class AuthState {
 	Connecting,
@@ -60,14 +68,15 @@ struct AuthSnapshot {
 
 class AuthController final {
 public:
-	AuthController()
-		: m_App(
-			std::string(loader::keyauth_config::Name),
-			std::string(loader::keyauth_config::OwnerId),
-			std::string(loader::keyauth_config::Version),
-			std::string(loader::keyauth_config::Url),
-			std::string(loader::keyauth_config::Path)
-		) {
+	explicit AuthController(const loader::ProductDefinition& product)
+		: m_Product(product),
+		  m_App(
+			std::string(product.KeyAuthName),
+			std::string(product.KeyAuthOwnerId),
+			std::string(product.KeyAuthVersion),
+			std::string(product.KeyAuthUrl),
+			std::string(product.KeyAuthPath)
+		  ) {
 	}
 
 	~AuthController() {
@@ -78,23 +87,30 @@ public:
 	AuthController& operator=(const AuthController&) = delete;
 
 	void Initialize() {
-		Run(AuthState::Connecting, "Connecting to authentication service...", [this] {
-			m_App.init();
+		Run(
+			AuthState::Connecting,
+			"Connecting to " + std::string(m_Product.DisplayName) + "...",
+			[this] {
+				m_App.init();
 
-			std::scoped_lock lock(m_Mutex);
-			if (!m_App.response.success) {
-				m_Snapshot.State = AuthState::Error;
-				m_Snapshot.Status = m_App.response.message.empty()
-					? "Authentication initialization failed."
-					: m_App.response.message;
+				std::scoped_lock lock(m_Mutex);
+				if (!m_App.response.success) {
+					m_Snapshot.State = AuthState::Error;
+					m_Snapshot.Status = m_App.response.message.empty()
+						? "Authentication initialization failed."
+						: m_App.response.message;
+					m_Snapshot.Authenticated = false;
+					return;
+				}
+
+				m_Snapshot.State = AuthState::Ready;
+				m_Snapshot.Status =
+					"Ready. Enter your " +
+					std::string(m_Product.DisplayName) +
+					" license key.";
 				m_Snapshot.Authenticated = false;
-				return;
 			}
-
-			m_Snapshot.State = AuthState::Ready;
-			m_Snapshot.Status = "Ready. Enter your license key.";
-			m_Snapshot.Authenticated = false;
-		});
+		);
 	}
 
 	void Authenticate(std::string license, bool remember) {
@@ -105,47 +121,60 @@ public:
 			return;
 		}
 
-		Run(AuthState::Authenticating, "Validating license...", [this, license = std::move(license), remember] {
-			m_App.license(license);
+		Run(
+			AuthState::Authenticating,
+			"Validating " + std::string(m_Product.DisplayName) + " license...",
+			[this, license = std::move(license), remember] {
+				// This KeyAuth::api instance was created from the selected
+				// product's independent KeyAuth application configuration.
+				m_App.license(license);
 
-			std::scoped_lock lock(m_Mutex);
-			if (!m_App.response.success) {
-				m_Snapshot.State = AuthState::Error;
-				m_Snapshot.Status = m_App.response.message.empty()
-					? "License validation failed."
-					: m_App.response.message;
-				m_Snapshot.Authenticated = false;
-				return;
+				std::scoped_lock lock(m_Mutex);
+				if (!m_App.response.success) {
+					m_Snapshot.State = AuthState::Error;
+					m_Snapshot.Status = m_App.response.message.empty()
+						? "License validation failed."
+						: m_App.response.message;
+					m_Snapshot.Authenticated = false;
+					return;
+				}
+
+				m_Snapshot.State = AuthState::Authenticated;
+				m_Snapshot.Status =
+					std::string(m_Product.DisplayName) +
+					" authentication successful.";
+				m_Snapshot.Authenticated = true;
+				m_Snapshot.Username = m_App.user_data.username;
+
+				if (!m_App.user_data.subscriptions.empty()) {
+					const auto& subscription =
+						m_App.user_data.subscriptions.front();
+					m_Snapshot.Subscription = subscription.name;
+					m_Snapshot.Expiry = subscription.expiry;
+				} else {
+					m_Snapshot.Subscription.clear();
+					m_Snapshot.Expiry.clear();
+				}
+
+				if (remember) {
+					(void)loader::license_store::Save(
+						m_Product.Slug,
+						license
+					);
+				} else {
+					loader::license_store::Clear(m_Product.Slug);
+				}
+
+				m_NextSessionCheck =
+					std::chrono::steady_clock::now() +
+					std::chrono::seconds(60);
 			}
-
-			m_Snapshot.State = AuthState::Authenticated;
-			m_Snapshot.Status = "Authentication successful.";
-			m_Snapshot.Authenticated = true;
-			m_Snapshot.Username = m_App.user_data.username;
-
-			if (!m_App.user_data.subscriptions.empty()) {
-				const auto& subscription = m_App.user_data.subscriptions.front();
-				m_Snapshot.Subscription = subscription.name;
-				m_Snapshot.Expiry = subscription.expiry;
-			} else {
-				m_Snapshot.Subscription.clear();
-				m_Snapshot.Expiry.clear();
-			}
-
-			if (remember) {
-				(void)loader::license_store::Save(license);
-			} else {
-				loader::license_store::Clear();
-			}
-
-			m_NextSessionCheck =
-				std::chrono::steady_clock::now() +
-				std::chrono::seconds(60);
-		});
+		);
 	}
 
 	void Tick() {
 		const AuthSnapshot snapshot = Snapshot();
+
 		if (
 			!snapshot.Authenticated ||
 			snapshot.Busy ||
@@ -154,26 +183,33 @@ public:
 			return;
 		}
 
-		Run(AuthState::Authenticated, "Session active.", [this] {
-			m_App.check();
+		Run(
+			AuthState::Authenticated,
+			std::string(m_Product.DisplayName) + " session active.",
+			[this] {
+				m_App.check();
 
-			std::scoped_lock lock(m_Mutex);
-			if (!m_App.response.success) {
-				m_Snapshot.State = AuthState::SessionInvalid;
-				m_Snapshot.Status = m_App.response.message.empty()
-					? "Session validation failed."
-					: m_App.response.message;
-				m_Snapshot.Authenticated = false;
-				return;
+				std::scoped_lock lock(m_Mutex);
+				if (!m_App.response.success) {
+					m_Snapshot.State = AuthState::SessionInvalid;
+					m_Snapshot.Status = m_App.response.message.empty()
+						? "Session validation failed."
+						: m_App.response.message;
+					m_Snapshot.Authenticated = false;
+					return;
+				}
+
+				m_Snapshot.State = AuthState::Authenticated;
+				m_Snapshot.Status =
+					std::string(m_Product.DisplayName) +
+					" session active.";
+				m_Snapshot.Authenticated = true;
+
+				m_NextSessionCheck =
+					std::chrono::steady_clock::now() +
+					std::chrono::seconds(60);
 			}
-
-			m_Snapshot.State = AuthState::Authenticated;
-			m_Snapshot.Status = "Session active.";
-			m_Snapshot.Authenticated = true;
-			m_NextSessionCheck =
-				std::chrono::steady_clock::now() +
-				std::chrono::seconds(60);
-		});
+		);
 	}
 
 	[[nodiscard]] AuthSnapshot Snapshot() const {
@@ -183,7 +219,11 @@ public:
 
 private:
 	template <typename Fn>
-	void Run(AuthState state, std::string status, Fn&& fn) {
+	void Run(
+		AuthState state,
+		std::string status,
+		Fn&& fn
+	) {
 		if (m_Busy.exchange(true)) {
 			return;
 		}
@@ -209,7 +249,8 @@ private:
 				} catch (...) {
 					std::scoped_lock lock(m_Mutex);
 					m_Snapshot.State = AuthState::Error;
-					m_Snapshot.Status = "Unexpected authentication error.";
+					m_Snapshot.Status =
+						"Unexpected authentication error.";
 					m_Snapshot.Authenticated = false;
 				}
 
@@ -217,6 +258,7 @@ private:
 					std::scoped_lock lock(m_Mutex);
 					m_Snapshot.Busy = false;
 				}
+
 				m_Busy.store(false);
 			}
 		);
@@ -228,7 +270,9 @@ private:
 		}
 	}
 
+	const loader::ProductDefinition& m_Product;
 	KeyAuth::api m_App;
+
 	mutable std::mutex m_Mutex;
 	AuthSnapshot m_Snapshot{};
 	std::thread m_Worker;
@@ -254,6 +298,7 @@ void DestroyRenderTarget() {
 
 bool CreateRenderTarget() {
 	ID3D11Texture2D* backBuffer = nullptr;
+
 	if (
 		FAILED(g_Dx.SwapChain->GetBuffer(
 			0,
@@ -269,6 +314,7 @@ bool CreateRenderTarget() {
 		nullptr,
 		&g_Dx.Target
 	);
+
 	backBuffer->Release();
 	return SUCCEEDED(result);
 }
@@ -314,10 +360,12 @@ void CleanupDevice() {
 		g_Dx.SwapChain->Release();
 		g_Dx.SwapChain = nullptr;
 	}
+
 	if (g_Dx.Context) {
 		g_Dx.Context->Release();
 		g_Dx.Context = nullptr;
 	}
+
 	if (g_Dx.Device) {
 		g_Dx.Device->Release();
 		g_Dx.Device = nullptr;
@@ -327,6 +375,7 @@ void CleanupDevice() {
 void CenterWindow(HWND hwnd) {
 	const int screenWidth = GetSystemMetrics(SM_CXSCREEN);
 	const int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
 	SetWindowPos(
 		hwnd,
 		HWND_TOP,
@@ -353,19 +402,25 @@ LRESULT CALLBACK WndProc(
 
 	switch (message) {
 	case WM_NCHITTEST: {
-		const LRESULT hit = DefWindowProcW(hwnd, message, wparam, lparam);
+		const LRESULT hit =
+			DefWindowProcW(hwnd, message, wparam, lparam);
+
 		if (hit == HTCLIENT) {
 			POINT point{
 				GET_X_LPARAM(lparam),
 				GET_Y_LPARAM(lparam)
 			};
+
 			ScreenToClient(hwnd, &point);
+
 			if (point.y >= 0 && point.y < 38) {
 				return HTCAPTION;
 			}
 		}
+
 		return hit;
 	}
+
 	case WM_SIZE:
 		if (
 			g_Dx.Device &&
@@ -373,6 +428,7 @@ LRESULT CALLBACK WndProc(
 			g_Dx.SwapChain
 		) {
 			DestroyRenderTarget();
+
 			g_Dx.SwapChain->ResizeBuffers(
 				0,
 				LOWORD(lparam),
@@ -380,12 +436,15 @@ LRESULT CALLBACK WndProc(
 				DXGI_FORMAT_UNKNOWN,
 				0
 			);
+
 			(void)CreateRenderTarget();
 		}
 		return 0;
+
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
+
 	default:
 		break;
 	}
@@ -395,6 +454,7 @@ LRESULT CALLBACK WndProc(
 
 void ApplyStyle() {
 	ImGuiStyle& style = ImGui::GetStyle();
+
 	style.WindowRounding = 0.0f;
 	style.ChildRounding = 0.0f;
 	style.FrameRounding = 2.0f;
@@ -407,42 +467,63 @@ void ApplyStyle() {
 	style.FrameBorderSize = 1.0f;
 
 	ImVec4* colors = style.Colors;
-	colors[ImGuiCol_WindowBg] = ImVec4(0.055f, 0.055f, 0.060f, 1.0f);
-	colors[ImGuiCol_ChildBg] = ImVec4(0.075f, 0.075f, 0.082f, 1.0f);
-	colors[ImGuiCol_Border] = ImVec4(0.17f, 0.17f, 0.19f, 1.0f);
-	colors[ImGuiCol_FrameBg] = ImVec4(0.11f, 0.11f, 0.12f, 1.0f);
-	colors[ImGuiCol_FrameBgHovered] = ImVec4(0.15f, 0.15f, 0.17f, 1.0f);
-	colors[ImGuiCol_FrameBgActive] = ImVec4(0.17f, 0.17f, 0.19f, 1.0f);
-	colors[ImGuiCol_Button] = ImVec4(0.36f, 0.18f, 0.62f, 1.0f);
-	colors[ImGuiCol_ButtonHovered] = ImVec4(0.43f, 0.23f, 0.72f, 1.0f);
-	colors[ImGuiCol_ButtonActive] = ImVec4(0.31f, 0.15f, 0.55f, 1.0f);
-	colors[ImGuiCol_CheckMark] = ImVec4(0.67f, 0.42f, 0.95f, 1.0f);
-	colors[ImGuiCol_Text] = ImVec4(0.88f, 0.88f, 0.90f, 1.0f);
-	colors[ImGuiCol_TextDisabled] = ImVec4(0.48f, 0.48f, 0.52f, 1.0f);
+
+	colors[ImGuiCol_WindowBg] =
+		ImVec4(0.055f, 0.055f, 0.060f, 1.0f);
+	colors[ImGuiCol_ChildBg] =
+		ImVec4(0.075f, 0.075f, 0.082f, 1.0f);
+	colors[ImGuiCol_Border] =
+		ImVec4(0.17f, 0.17f, 0.19f, 1.0f);
+	colors[ImGuiCol_FrameBg] =
+		ImVec4(0.11f, 0.11f, 0.12f, 1.0f);
+	colors[ImGuiCol_FrameBgHovered] =
+		ImVec4(0.15f, 0.15f, 0.17f, 1.0f);
+	colors[ImGuiCol_FrameBgActive] =
+		ImVec4(0.17f, 0.17f, 0.19f, 1.0f);
+	colors[ImGuiCol_Button] =
+		ImVec4(0.36f, 0.18f, 0.62f, 1.0f);
+	colors[ImGuiCol_ButtonHovered] =
+		ImVec4(0.43f, 0.23f, 0.72f, 1.0f);
+	colors[ImGuiCol_ButtonActive] =
+		ImVec4(0.31f, 0.15f, 0.55f, 1.0f);
+	colors[ImGuiCol_CheckMark] =
+		ImVec4(0.67f, 0.42f, 0.95f, 1.0f);
+	colors[ImGuiCol_Text] =
+		ImVec4(0.88f, 0.88f, 0.90f, 1.0f);
+	colors[ImGuiCol_TextDisabled] =
+		ImVec4(0.48f, 0.48f, 0.52f, 1.0f);
 }
 
-bool LaunchConfiguredTarget(std::string& message) {
+bool LaunchConfiguredTarget(
+	const loader::ProductDefinition& product,
+	std::string& message
+) {
 	wchar_t target[32768]{};
+
 	const DWORD count = GetEnvironmentVariableW(
-		L"LUVKRIMES_TARGET",
+		product.TargetEnvironmentVariable.data(),
 		target,
 		static_cast<DWORD>(_countof(target))
 	);
 
 	if (count == 0 || count >= _countof(target)) {
 		message =
-			"Authenticated. Set LUVKRIMES_TARGET to a signed application "
-			"executable if you want the loader to launch it.";
+			"Authenticated. Configure " +
+			std::string(product.Slug) +
+			"'s launch target with its dedicated environment variable.";
 		return false;
 	}
 
 	const std::filesystem::path path(target);
+
 	if (!std::filesystem::is_regular_file(path)) {
 		message = "Configured target executable was not found.";
 		return false;
 	}
 
-	std::wstring command = L"\"" + path.wstring() + L"\"";
+	std::wstring command =
+		L"\"" + path.wstring() + L"\"";
+
 	std::vector<wchar_t> mutableCommand(
 		command.begin(),
 		command.end()
@@ -451,6 +532,7 @@ bool LaunchConfiguredTarget(std::string& message) {
 
 	STARTUPINFOW startup{};
 	startup.cb = sizeof(startup);
+
 	PROCESS_INFORMATION process{};
 
 	if (!CreateProcessW(
@@ -471,30 +553,17 @@ bool LaunchConfiguredTarget(std::string& message) {
 
 	CloseHandle(process.hThread);
 	CloseHandle(process.hProcess);
-	message = "Target launched.";
+
+	message =
+		std::string(product.DisplayName) +
+		" target launched.";
+
 	return true;
 }
 
-void DrawLoader(
-	AuthController& auth,
-	std::array<char, 192>& license,
-	bool& remember,
-	bool& requestClose
-) {
-	const AuthSnapshot snapshot = auth.Snapshot();
-
-	ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
-	ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
-
-	ImGui::Begin(
-		"##loader",
-		nullptr,
-		ImGuiWindowFlags_NoDecoration |
-		ImGuiWindowFlags_NoMove |
-		ImGuiWindowFlags_NoSavedSettings
-	);
-
+void DrawWindowChrome(bool& requestClose) {
 	ImDrawList* draw = ImGui::GetWindowDrawList();
+
 	const ImVec2 min = ImGui::GetWindowPos();
 	const ImVec2 max = min + ImGui::GetWindowSize();
 
@@ -503,6 +572,7 @@ void DrawLoader(
 		ImVec2(max.x, min.y + 38.0f),
 		IM_COL32(20, 20, 22, 255)
 	);
+
 	draw->AddLine(
 		ImVec2(min.x, min.y + 38.0f),
 		ImVec2(max.x, min.y + 38.0f),
@@ -510,36 +580,191 @@ void DrawLoader(
 	);
 
 	ImGui::SetCursorPos(ImVec2(18.0f, 12.0f));
-	ImGui::TextUnformatted("LUVKRIMES // AUTH");
+	ImGui::TextUnformatted("LUVKRIMES // MULTI LOADER");
 
-	ImGui::SetCursorPos(ImVec2(528.0f, 8.0f));
+	ImGui::SetCursorPos(ImVec2(588.0f, 8.0f));
+
 	if (ImGui::Button("X", ImVec2(24.0f, 22.0f))) {
 		requestClose = true;
 	}
+}
 
+bool ProductCard(
+	const loader::ProductDefinition& product,
+	ImVec2 size
+) {
+	ImGui::PushID(product.Slug.data());
+
+	const ImVec2 cursor = ImGui::GetCursorScreenPos();
+
+	ImGui::BeginDisabled(!product.Configured);
+
+	const bool pressed =
+		ImGui::Button("##card", size);
+
+	ImGui::EndDisabled();
+
+	ImDrawList* draw = ImGui::GetWindowDrawList();
+
+	const ImVec2 bottomRight = cursor + size;
+
+	draw->AddRect(
+		cursor,
+		bottomRight,
+		product.Configured
+			? IM_COL32(89, 54, 128, 255)
+			: IM_COL32(48, 48, 52, 255)
+	);
+
+	draw->AddText(
+		cursor + ImVec2(16.0f, 18.0f),
+		product.Configured
+			? IM_COL32(235, 235, 238, 255)
+			: IM_COL32(120, 120, 125, 255),
+		product.DisplayName.data()
+	);
+
+	draw->AddText(
+		cursor + ImVec2(16.0f, 46.0f),
+		IM_COL32(140, 140, 148, 255),
+		product.Subtitle.data()
+	);
+
+	draw->AddText(
+		cursor + ImVec2(16.0f, size.y - 30.0f),
+		product.Configured
+			? IM_COL32(171, 107, 242, 255)
+			: IM_COL32(180, 100, 100, 255),
+		product.Configured
+			? "SELECT"
+			: "CONFIGURATION REQUIRED"
+	);
+
+	ImGui::PopID();
+	return pressed && product.Configured;
+}
+
+void DrawProductSelection(
+	const loader::ProductDefinition*& selectedProduct,
+	Screen& screen
+) {
 	ImGui::SetCursorPos(ImVec2(34.0f, 67.0f));
+
 	ImGui::BeginChild(
-		"##auth-card",
-		ImVec2(492.0f, 238.0f),
+		"##products",
+		ImVec2(552.0f, 278.0f),
 		true
 	);
 
 	ImGui::TextColored(
 		ImVec4(0.67f, 0.42f, 0.95f, 1.0f),
-		"SECURE AUTHENTICATION"
+		"SELECT PRODUCT"
 	);
+
+	ImGui::TextDisabled(
+		"Each product uses its own independent license pool."
+	);
+
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	const ImVec2 cardSize(250.0f, 148.0f);
+
+	for (std::size_t index = 0; index < loader::Products.size(); ++index) {
+		const auto& product = loader::Products[index];
+
+		if (index > 0) {
+			ImGui::SameLine();
+		}
+
+		if (ProductCard(product, cardSize)) {
+			selectedProduct = &product;
+			screen = Screen::Authentication;
+		}
+	}
+
 	ImGui::Spacing();
 	ImGui::TextDisabled(
-		"KeyAuth %s  //  API 1.3",
-		loader::keyauth_config::Version.data()
+		"More projects can be added to product_registry.hpp."
 	);
+
+	ImGui::EndChild();
+}
+
+void LoadRememberedLicense(
+	const loader::ProductDefinition& product,
+	std::array<char, 192>& license
+) {
+	license.fill('\0');
+
+	std::string savedLicense;
+
+	if (!loader::license_store::Load(product.Slug, savedLicense)) {
+		return;
+	}
+
+	const std::size_t count = (std::min)(
+		savedLicense.size(),
+		license.size() - 1
+	);
+
+	std::memcpy(
+		license.data(),
+		savedLicense.data(),
+		count
+	);
+
+	license[count] = '\0';
+}
+
+void DrawAuthentication(
+	const loader::ProductDefinition& product,
+	AuthController& auth,
+	std::array<char, 192>& license,
+	bool& remember,
+	bool& goBack,
+	bool& requestClose
+) {
+	const AuthSnapshot snapshot = auth.Snapshot();
+
+	ImGui::SetCursorPos(ImVec2(34.0f, 61.0f));
+
+	if (ImGui::Button("< PRODUCTS", ImVec2(112.0f, 28.0f))) {
+		goBack = true;
+	}
+
+	ImGui::SetCursorPos(ImVec2(34.0f, 100.0f));
+
+	ImGui::BeginChild(
+		"##auth-card",
+		ImVec2(552.0f, 245.0f),
+		true
+	);
+
+	ImGui::TextColored(
+		ImVec4(0.67f, 0.42f, 0.95f, 1.0f),
+		"%s // AUTHENTICATION",
+		product.DisplayName.data()
+	);
+
+	ImGui::TextDisabled(
+		"Independent KeyAuth application // API 1.3 // v%s",
+		product.KeyAuthVersion.data()
+	);
+
 	ImGui::Spacing();
 	ImGui::Separator();
 	ImGui::Spacing();
 
 	if (!snapshot.Authenticated) {
-		ImGui::TextUnformatted("License key");
+		ImGui::Text(
+			"%s license key",
+			product.DisplayName.data()
+		);
+
 		ImGui::SetNextItemWidth(-1.0f);
+
 		ImGui::InputTextWithHint(
 			"##license",
 			"XXXXXX-XXXXXX-XXXXXX",
@@ -548,18 +773,37 @@ void DrawLoader(
 			ImGuiInputTextFlags_Password
 		);
 
-		ImGui::Checkbox("Remember on this Windows account", &remember);
+		ImGui::Checkbox(
+			"Remember this product key on this Windows account",
+			&remember
+		);
+
 		ImGui::Spacing();
 
 		ImGui::BeginDisabled(snapshot.Busy);
-		if (ImGui::Button("AUTHENTICATE", ImVec2(-1.0f, 38.0f))) {
-			auth.Authenticate(std::string(license.data()), remember);
+
+		if (ImGui::Button(
+			"AUTHENTICATE",
+			ImVec2(-1.0f, 38.0f)
+		)) {
+			auth.Authenticate(
+				std::string(license.data()),
+				remember
+			);
 		}
+
 		ImGui::EndDisabled();
 	} else {
 		ImGui::Text(
+			"Product: %s",
+			product.DisplayName.data()
+		);
+
+		ImGui::Text(
 			"User: %s",
-			snapshot.Username.empty() ? "licensed user" : snapshot.Username.c_str()
+			snapshot.Username.empty()
+				? "licensed user"
+				: snapshot.Username.c_str()
 		);
 
 		if (!snapshot.Subscription.empty()) {
@@ -568,6 +812,7 @@ void DrawLoader(
 				snapshot.Subscription.c_str()
 			);
 		}
+
 		if (!snapshot.Expiry.empty()) {
 			ImGui::Text(
 				"Expiry: %s",
@@ -578,14 +823,21 @@ void DrawLoader(
 		ImGui::Spacing();
 
 		static std::string launchStatus;
-		if (ImGui::Button("CONTINUE", ImVec2(-1.0f, 38.0f))) {
-			if (LaunchConfiguredTarget(launchStatus)) {
+
+		if (ImGui::Button(
+			"LAUNCH",
+			ImVec2(-1.0f, 38.0f)
+		)) {
+			if (LaunchConfiguredTarget(product, launchStatus)) {
 				requestClose = true;
 			}
 		}
 
 		if (!launchStatus.empty()) {
-			ImGui::TextWrapped("%s", launchStatus.c_str());
+			ImGui::TextWrapped(
+				"%s",
+				launchStatus.c_str()
+			);
 		}
 	}
 
@@ -601,10 +853,13 @@ void DrawLoader(
 				? ImVec4(0.95f, 0.38f, 0.38f, 1.0f)
 				: ImVec4(0.70f, 0.70f, 0.74f, 1.0f);
 
-	ImGui::TextColored(statusColor, "%s", snapshot.Status.c_str());
+	ImGui::TextColored(
+		statusColor,
+		"%s",
+		snapshot.Status.c_str()
+	);
 
 	ImGui::EndChild();
-	ImGui::End();
 }
 
 } // namespace
@@ -661,9 +916,11 @@ int WINAPI wWinMain(
 	UpdateWindow(hwnd);
 
 	ImGui::CreateContext();
+
 	ImGuiIO& io = ImGui::GetIO();
 	io.IniFilename = nullptr;
 	io.LogFilename = nullptr;
+
 	ApplyStyle();
 
 	if (
@@ -677,29 +934,23 @@ int WINAPI wWinMain(
 		return 1;
 	}
 
+	Screen screen = Screen::ProductSelect;
+	const loader::ProductDefinition* selectedProduct = nullptr;
+
+	std::unique_ptr<AuthController> auth;
 	std::array<char, 192> license{};
 	bool remember = true;
 
-	std::string savedLicense;
-	if (loader::license_store::Load(savedLicense)) {
-		const std::size_t count = (std::min)(
-			savedLicense.size(),
-			license.size() - 1
-		);
-		std::memcpy(license.data(), savedLicense.data(), count);
-		license[count] = '\0';
-	}
-
-	AuthController auth;
-	auth.Initialize();
-
 	bool running = true;
+
 	while (running) {
 		MSG msg{};
+
 		while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			if (msg.message == WM_QUIT) {
 				running = false;
 			}
+
 			TranslateMessage(&msg);
 			DispatchMessageW(&msg);
 		}
@@ -708,15 +959,78 @@ int WINAPI wWinMain(
 			break;
 		}
 
-		auth.Tick();
+		if (auth) {
+			auth->Tick();
+		}
 
 		ImGui_ImplDX11_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
-		bool requestClose = false;
-		DrawLoader(auth, license, remember, requestClose);
+		ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+		ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
 
+		ImGui::Begin(
+			"##loader",
+			nullptr,
+			ImGuiWindowFlags_NoDecoration |
+			ImGuiWindowFlags_NoMove |
+			ImGuiWindowFlags_NoSavedSettings
+		);
+
+		bool requestClose = false;
+
+		DrawWindowChrome(requestClose);
+
+		if (screen == Screen::ProductSelect) {
+			const loader::ProductDefinition* requestedProduct = nullptr;
+
+			DrawProductSelection(
+				requestedProduct,
+				screen
+			);
+
+			if (requestedProduct) {
+				selectedProduct = requestedProduct;
+				remember = true;
+
+				LoadRememberedLicense(
+					*selectedProduct,
+					license
+				);
+
+				auth =
+					std::make_unique<AuthController>(
+						*selectedProduct
+					);
+
+				auth->Initialize();
+			}
+		} else if (
+			screen == Screen::Authentication &&
+			selectedProduct &&
+			auth
+		) {
+			bool goBack = false;
+
+			DrawAuthentication(
+				*selectedProduct,
+				*auth,
+				license,
+				remember,
+				goBack,
+				requestClose
+			);
+
+			if (goBack) {
+				auth.reset();
+				selectedProduct = nullptr;
+				license.fill('\0');
+				screen = Screen::ProductSelect;
+			}
+		}
+
+		ImGui::End();
 		ImGui::Render();
 
 		constexpr float clear[4] = {
@@ -731,17 +1045,24 @@ int WINAPI wWinMain(
 			&g_Dx.Target,
 			nullptr
 		);
+
 		g_Dx.Context->ClearRenderTargetView(
 			g_Dx.Target,
 			clear
 		);
-		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+		ImGui_ImplDX11_RenderDrawData(
+			ImGui::GetDrawData()
+		);
+
 		g_Dx.SwapChain->Present(1, 0);
 
 		if (requestClose) {
 			running = false;
 		}
 	}
+
+	auth.reset();
 
 	ImGui_ImplDX11_Shutdown();
 	ImGui_ImplWin32_Shutdown();
@@ -750,5 +1071,6 @@ int WINAPI wWinMain(
 	CleanupDevice();
 	DestroyWindow(hwnd);
 	UnregisterClassW(kClassName, instance);
+
 	return 0;
 }
