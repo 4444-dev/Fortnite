@@ -129,8 +129,8 @@ void KeyValueConfig::SetInt(std::string key, int value) {
 void KeyValueConfig::SetFloat(std::string key, float value) {
 	char buffer[64]{};
 	const auto result = std::to_chars(
-		std::begin(buffer),
-		std::end(buffer),
+		buffer,
+		buffer + sizeof(buffer),
 		value,
 		std::chars_format::general,
 		std::numeric_limits<float>::max_digits10
