@@ -421,7 +421,7 @@ void LoadRememberedLicense(
 void DrawAuthentication(
 	const loader::ProductDefinition& product,
 	loader::AuthController& auth,
-	std::array<char, 192>& license,
+	LicenseBuffer& license,
 	bool& remember,
 	bool& goBack,
 	bool& requestClose,
