@@ -86,6 +86,24 @@ bool Renderer::Initialize(HWND hwnd) {
 	io.IniFilename = nullptr;
 	io.LogFilename = nullptr;
 
+	ImFont* uiFont = io.Fonts->AddFontFromFileTTF(
+		"C:\\Windows\\Fonts\\segoeui.ttf",
+		16.0f,
+		nullptr,
+		io.Fonts->GetGlyphRangesDefault()
+	);
+	if (!uiFont) {
+		uiFont = io.Fonts->AddFontFromFileTTF(
+			"C:\\Windows\\Fonts\\seguisb.ttf",
+			16.0f,
+			nullptr,
+			io.Fonts->GetGlyphRangesDefault()
+		);
+	}
+	if (uiFont) {
+		io.FontDefault = uiFont;
+	}
+
 	if (!ImGui_ImplWin32_Init(hwnd)) {
 		Shutdown();
 		return false;
