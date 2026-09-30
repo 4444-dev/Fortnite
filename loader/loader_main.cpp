@@ -1,16 +1,12 @@
 #include "auth_controller.hpp"
 #include "launch_target.hpp"
 #include "license_store.hpp"
+#include "loader_renderer.hpp"
+#include "loader_window.hpp"
 #include "product_registry.hpp"
 
-#include <Windows.h>
-#include <windowsx.h>
-#include <d3d11.h>
-#include <dwmapi.h>
 
 #include <thirdparty/imgui/imgui.h>
-#include <thirdparty/imgui/backends/imgui_impl_dx11.h>
-#include <thirdparty/imgui/backends/imgui_impl_win32.h>
 
 #include <algorithm>
 #include <array>
@@ -18,23 +14,8 @@
 #include <memory>
 #include <string>
 
-#pragma comment(lib, "d3d11.lib")
-#pragma comment(lib, "dxgi.lib")
-#pragma comment(lib, "dwmapi.lib")
-
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(
-	HWND hWnd,
-	UINT msg,
-	WPARAM wParam,
-	LPARAM lParam
-);
-
 namespace {
 
-constexpr wchar_t kClassName[] = L"LuvkrimesLoaderWindow";
-constexpr wchar_t kWindowTitle[] = L"luvkrimes loader";
-constexpr int kWindowWidth = 620;
-constexpr int kWindowHeight = 390;
 
 enum class Screen {
 	ProductSelect,
@@ -43,171 +24,6 @@ enum class Screen {
 
 using LicenseBuffer =
 	std::array<char, loader::license_store::kMaxLicenseLength + 1>;
-
-struct DxState {
-	ID3D11Device* Device = nullptr;
-	ID3D11DeviceContext* Context = nullptr;
-	IDXGISwapChain* SwapChain = nullptr;
-	ID3D11RenderTargetView* Target = nullptr;
-};
-
-DxState g_Dx{};
-
-void DestroyRenderTarget() {
-	if (g_Dx.Target) {
-		g_Dx.Target->Release();
-		g_Dx.Target = nullptr;
-	}
-}
-
-bool CreateRenderTarget() {
-	ID3D11Texture2D* backBuffer = nullptr;
-
-	if (
-		FAILED(g_Dx.SwapChain->GetBuffer(
-			0,
-			IID_PPV_ARGS(&backBuffer)
-		)) ||
-		!backBuffer
-	) {
-		return false;
-	}
-
-	const HRESULT result = g_Dx.Device->CreateRenderTargetView(
-		backBuffer,
-		nullptr,
-		&g_Dx.Target
-	);
-
-	backBuffer->Release();
-	return SUCCEEDED(result);
-}
-
-bool CreateDevice(HWND hwnd) {
-	DXGI_SWAP_CHAIN_DESC desc{};
-	desc.BufferCount = 2;
-	desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	desc.OutputWindow = hwnd;
-	desc.SampleDesc.Count = 1;
-	desc.Windowed = TRUE;
-	desc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-
-	D3D_FEATURE_LEVEL featureLevel{};
-	const D3D_FEATURE_LEVEL levels[] = {
-		D3D_FEATURE_LEVEL_11_0,
-		D3D_FEATURE_LEVEL_10_0
-	};
-
-	const HRESULT result = D3D11CreateDeviceAndSwapChain(
-		nullptr,
-		D3D_DRIVER_TYPE_HARDWARE,
-		nullptr,
-		0,
-		levels,
-		static_cast<UINT>(_countof(levels)),
-		D3D11_SDK_VERSION,
-		&desc,
-		&g_Dx.SwapChain,
-		&g_Dx.Device,
-		&featureLevel,
-		&g_Dx.Context
-	);
-
-	return SUCCEEDED(result) && CreateRenderTarget();
-}
-
-void CleanupDevice() {
-	DestroyRenderTarget();
-	if (g_Dx.SwapChain) g_Dx.SwapChain->Release();
-	if (g_Dx.Context) g_Dx.Context->Release();
-	if (g_Dx.Device) g_Dx.Device->Release();
-	g_Dx.SwapChain = nullptr;
-	g_Dx.Context = nullptr;
-	g_Dx.Device = nullptr;
-}
-
-void CenterWindow(HWND hwnd) {
-	const int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-	const int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-
-	SetWindowPos(
-		hwnd,
-		HWND_TOP,
-		(screenWidth - kWindowWidth) / 2,
-		(screenHeight - kWindowHeight) / 2,
-		kWindowWidth,
-		kWindowHeight,
-		SWP_NOACTIVATE
-	);
-}
-
-LRESULT CALLBACK WndProc(
-	HWND hwnd,
-	UINT message,
-	WPARAM wparam,
-	LPARAM lparam
-) {
-	if (
-		ImGui::GetCurrentContext() &&
-		ImGui_ImplWin32_WndProcHandler(hwnd, message, wparam, lparam)
-	) {
-		return TRUE;
-	}
-
-	switch (message) {
-	case WM_NCHITTEST: {
-		const LRESULT hit =
-			DefWindowProcW(hwnd, message, wparam, lparam);
-
-		if (hit == HTCLIENT) {
-			POINT point{
-				GET_X_LPARAM(lparam),
-				GET_Y_LPARAM(lparam)
-			};
-
-			ScreenToClient(hwnd, &point);
-
-			if (point.y >= 0 && point.y < 38) {
-				return HTCAPTION;
-			}
-		}
-
-		return hit;
-	}
-
-	case WM_SIZE:
-		if (
-			g_Dx.Device &&
-			wparam != SIZE_MINIMIZED &&
-			g_Dx.SwapChain
-		) {
-			DestroyRenderTarget();
-
-			const HRESULT resizeResult = g_Dx.SwapChain->ResizeBuffers(
-				0,
-				LOWORD(lparam),
-				HIWORD(lparam),
-				DXGI_FORMAT_UNKNOWN,
-				0
-			);
-
-			if (SUCCEEDED(resizeResult)) {
-				(void)CreateRenderTarget();
-			}
-		}
-		return 0;
-
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		return 0;
-
-	default:
-		break;
-	}
-
-	return DefWindowProcW(hwnd, message, wparam, lparam);
-}
 
 void ApplyStyle() {
 	ImGuiStyle& style = ImGui::GetStyle();
