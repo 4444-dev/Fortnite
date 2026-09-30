@@ -150,11 +150,10 @@ AuthSnapshot AuthController::Snapshot() const {
 	return m_Snapshot;
 }
 
-template <typename Fn>
 void AuthController::Run(
 	AuthState state,
 	std::string status,
-	Fn&& fn
+	std::function<void()> task
 ) {
 	if (m_Busy.exchange(true)) {
 		return;
@@ -170,7 +169,7 @@ void AuthController::Run(
 	}
 
 	m_Worker = std::thread(
-		[this, task = std::forward<Fn>(fn)]() mutable {
+		[this, task = std::move(task)]() mutable {
 			try {
 				task();
 			} catch (const std::exception& exception) {
@@ -201,7 +200,5 @@ void AuthController::JoinWorker() {
 	}
 }
 
-// Explicit instantiations are unnecessary because Run is only used in this
-// translation unit.
 
 } // namespace loader
