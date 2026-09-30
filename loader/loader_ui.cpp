@@ -2,6 +2,8 @@
 
 #include "launch_target.hpp"
 
+#include <Windows.h>
+
 #include <thirdparty/imgui/imgui.h>
 
 #include <algorithm>
@@ -102,6 +104,10 @@ bool ProductCard(
 
 } // namespace
 
+UiController::~UiController() {
+	SecureZeroMemory(m_License.data(), m_License.size());
+}
+
 void ApplyLoaderStyle() {
 	ImGuiStyle& style = ImGui::GetStyle();
 
@@ -144,8 +150,14 @@ void ApplyLoaderStyle() {
 }
 
 void UiController::Tick() {
-	if (m_Auth) {
-		m_Auth->Tick();
+	if (!m_Auth) {
+		return;
+	}
+
+	m_Auth->Tick();
+
+	if (m_License[0] != '\0' && m_Auth->Snapshot().Authenticated) {
+		SecureZeroMemory(m_License.data(), m_License.size());
 	}
 }
 
@@ -177,7 +189,7 @@ void UiController::DrawProductSelection() {
 
 	ImGui::BeginChild(
 		"##products",
-		ImVec2(552.0f, 278.0f),
+		ImVec2(-34.0f, 278.0f),
 		true
 	);
 
@@ -254,7 +266,7 @@ void UiController::DrawAuthentication(bool& requestClose) {
 
 	ImGui::BeginChild(
 		"##auth-card",
-		ImVec2(552.0f, 245.0f),
+		ImVec2(-34.0f, 245.0f),
 		true
 	);
 
@@ -279,14 +291,16 @@ void UiController::DrawAuthentication(bool& requestClose) {
 			product.DisplayName.data()
 		);
 
-		ImGui::SetNextItemWidth(-1.0f);
+		ImGui::BeginDisabled(snapshot.Busy);
 
-		ImGui::InputTextWithHint(
+		ImGui::SetNextItemWidth(-1.0f);
+		const bool submitted = ImGui::InputTextWithHint(
 			"##license",
 			"XXXXXX-XXXXXX-XXXXXX",
 			m_License.data(),
 			m_License.size(),
-			ImGuiInputTextFlags_Password
+			ImGuiInputTextFlags_Password |
+				ImGuiInputTextFlags_EnterReturnsTrue
 		);
 
 		ImGui::Checkbox(
@@ -296,17 +310,19 @@ void UiController::DrawAuthentication(bool& requestClose) {
 
 		ImGui::Spacing();
 
-		ImGui::BeginDisabled(snapshot.Busy);
-		if (ImGui::Button(
+		const bool authenticate = ImGui::Button(
 			"AUTHENTICATE",
 			ImVec2(-1.0f, 38.0f)
-		)) {
+		);
+
+		ImGui::EndDisabled();
+
+		if (!snapshot.Busy && (submitted || authenticate)) {
 			m_Auth->Authenticate(
 				std::string(m_License.data()),
 				m_Remember
 			);
 		}
-		ImGui::EndDisabled();
 	} else {
 		ImGui::Text(
 			"Product: %s",
