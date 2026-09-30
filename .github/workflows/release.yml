@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - release/VERSION
+      - .github/workflows/release.yml
 
 permissions:
   contents: write
@@ -49,6 +50,8 @@ jobs:
           } else {
             "exists=false" >> $env:GITHUB_OUTPUT
           }
+
+          exit 0
         env:
           GH_TOKEN: ${{ github.token }}
 
