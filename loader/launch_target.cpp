@@ -3,6 +3,7 @@
 #include <Windows.h>
 
 #include <filesystem>
+#include <string>
 #include <vector>
 
 namespace loader {
@@ -11,15 +12,22 @@ bool LaunchConfiguredTarget(
 	const ProductDefinition& product,
 	std::string& message
 ) {
+	if (!product.Configured || product.TargetEnvironmentVariable.empty()) {
+		message = "This product is not configured for launch.";
+		return false;
+	}
+
+	const std::wstring variable(product.TargetEnvironmentVariable);
 	wchar_t target[32768]{};
 
+	SetLastError(ERROR_SUCCESS);
 	const DWORD count = GetEnvironmentVariableW(
-		product.TargetEnvironmentVariable.data(),
+		variable.c_str(),
 		target,
 		static_cast<DWORD>(_countof(target))
 	);
 
-	if (count == 0 || count >= _countof(target)) {
+	if (count == 0) {
 		message =
 			"Authenticated. Configure " +
 			std::string(product.Slug) +
@@ -27,9 +35,24 @@ bool LaunchConfiguredTarget(
 		return false;
 	}
 
-	const std::filesystem::path path(target);
+	if (count >= _countof(target)) {
+		message = "Configured target path exceeds the Windows path buffer.";
+		return false;
+	}
 
-	if (!std::filesystem::is_regular_file(path)) {
+	const std::filesystem::path path(target);
+	std::error_code fileError;
+	const bool isFile = std::filesystem::is_regular_file(path, fileError);
+
+	if (fileError) {
+		message =
+			"Configured target could not be accessed (error " +
+			std::to_string(fileError.value()) +
+			").";
+		return false;
+	}
+
+	if (!isFile) {
 		message = "Configured target executable was not found.";
 		return false;
 	}
@@ -42,6 +65,9 @@ bool LaunchConfiguredTarget(
 	startup.cb = sizeof(startup);
 
 	PROCESS_INFORMATION process{};
+	const std::filesystem::path workingDirectory = path.parent_path();
+	const wchar_t* currentDirectory =
+		workingDirectory.empty() ? nullptr : workingDirectory.c_str();
 
 	if (!CreateProcessW(
 		path.c_str(),
@@ -51,11 +77,15 @@ bool LaunchConfiguredTarget(
 		FALSE,
 		0,
 		nullptr,
-		path.parent_path().c_str(),
+		currentDirectory,
 		&startup,
 		&process
 	)) {
-		message = "Failed to start configured target executable.";
+		const DWORD error = GetLastError();
+		message =
+			"Failed to start configured target (Windows error " +
+			std::to_string(error) +
+			").";
 		return false;
 	}
 
