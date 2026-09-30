@@ -254,6 +254,8 @@ int main() {
 			<< "# comment\n"
 			<< " valid = 7 \n"
 			<< "flag=false\n"
+			<< "duplicate=1\n"
+			<< "duplicate=2\n"
 			<< "broken-line\n"
 			<< "invalid_int=nope\n"
 			<< "invalid_float=nan\n"
@@ -269,7 +271,6 @@ int main() {
 	int valid = 0;
 	int invalid = 123;
 	int duplicate = 0;
-	float invalidFloat = 9.0f;
 	bool flag = true;
 	bool invalidBool = false;
 	float invalidFloat = 0.0f;
@@ -282,6 +283,12 @@ int main() {
 		return 1;
 	}
 	if (!Check(!parsed.TryGetInt("invalid_int", invalid), "reject invalid integer")) {
+		return 1;
+	}
+	if (!Check(
+		parsed.TryGetInt("duplicate", duplicate) && duplicate == 2,
+		"last duplicate config value wins"
+	)) {
 		return 1;
 	}
 	if (!Check(!parsed.TryGetFloat("invalid_float", invalidFloat), "reject non-finite float")) {
