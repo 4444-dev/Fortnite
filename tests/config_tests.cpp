@@ -13,7 +13,7 @@ namespace tests {
 bool RunConfigTests() {
 	const auto path =
 		std::filesystem::temp_directory_path() /
-		"luvkrimes-config-tests.ini";
+		"nexus-config-tests.ini";
 
 	util::KeyValueConfig output;
 	output.SetBool("enabled", true);
