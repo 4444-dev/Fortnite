@@ -24,6 +24,7 @@ struct ProductDefinition {
 	std::string_view KeyAuthPath;
 
 	std::wstring_view TargetEnvironmentVariable;
+	std::wstring_view PackagedTargetRelativePath;
 	bool Configured;
 };
 
@@ -61,6 +62,7 @@ inline constexpr std::array<ProductDefinition, 2> Products{{
 		"https://keyauth.win/api/1.3/",
 		"",
 		L"LUVKRIMES_TARGET_FORTNITE",
+		L"projects\\fortnite\\Luvkrimes-Fortnite.exe",
 		true
 	},
 	{
@@ -74,6 +76,7 @@ inline constexpr std::array<ProductDefinition, 2> Products{{
 		"https://keyauth.win/api/1.3/",
 		"",
 		L"LUVKRIMES_TARGET_APEX",
+		L"",
 		false
 	}
 }};
@@ -100,7 +103,8 @@ inline constexpr const ProductDefinition& ApexLegends = Products[1];
 				product.KeyAuthOwnerId.empty() ||
 				product.KeyAuthVersion.empty() ||
 				product.KeyAuthUrl.empty() ||
-				!product.KeyAuthUrl.starts_with("https://")
+				!product.KeyAuthUrl.starts_with("https://") ||
+				product.PackagedTargetRelativePath.empty()
 			)
 		) {
 			return false;
@@ -111,7 +115,12 @@ inline constexpr const ProductDefinition& ApexLegends = Products[1];
 				product.Id == Products[j].Id ||
 				product.Slug == Products[j].Slug ||
 				product.TargetEnvironmentVariable ==
-					Products[j].TargetEnvironmentVariable
+					Products[j].TargetEnvironmentVariable ||
+				(
+					!product.PackagedTargetRelativePath.empty() &&
+					product.PackagedTargetRelativePath ==
+						Products[j].PackagedTargetRelativePath
+				)
 			) {
 				return false;
 			}
