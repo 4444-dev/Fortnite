@@ -976,52 +976,96 @@ void UiController::DrawHome(
 	const ImVec2 origin =
 		ImGui::GetWindowPos();
 
+	// Hero lighting and watermark.
 	draw->AddCircleFilled(
 		ImVec2(
-			origin.x + windowSize.x - 160.0f,
-			origin.y + 150.0f
+			origin.x + windowSize.x - 140.0f,
+			origin.y + 132.0f
 		),
-		170.0f,
-		IM_COL32(115, 36, 212, 18),
-		64
+		188.0f,
+		IM_COL32(123, 49, 227, 20),
+		72
 	);
 
 	draw->AddText(
 		ImGui::GetFont(),
-		86.0f,
+		92.0f,
 		ImVec2(
-			origin.x + windowSize.x - 400.0f,
-			origin.y + 84.0f
+			origin.x + windowSize.x - 420.0f,
+			origin.y + 76.0f
 		),
-		IM_COL32(154, 74, 238, 18),
+		IM_COL32(171, 92, 255, 17),
 		"NEXUS"
 	);
 
-	for (int index = 0; index < 4; ++index) {
+	for (int index = 0; index < 5; ++index) {
 		const float offset =
-			static_cast<float>(index) * 44.0f;
+			static_cast<float>(index) * 38.0f;
 		draw->AddLine(
 			ImVec2(
-				origin.x + windowSize.x - 310.0f + offset,
-				origin.y + 72.0f
+				origin.x + windowSize.x - 315.0f + offset,
+				origin.y + 76.0f
 			),
 			ImVec2(
-				origin.x + windowSize.x - 410.0f + offset,
-				origin.y + 172.0f
+				origin.x + windowSize.x - 415.0f + offset,
+				origin.y + 176.0f
 			),
-			IM_COL32(164, 76, 255, 22),
-			8.0f
+			IM_COL32(169, 86, 255, 22),
+			6.0f
 		);
 	}
+
+	// Small hero badge.
+	const ImVec2 heroBadgePos(
+		origin.x + contentX,
+		origin.y + 86.0f
+	);
+	draw->AddRectFilled(
+		heroBadgePos,
+		ImVec2(
+			heroBadgePos.x + 152.0f,
+			heroBadgePos.y + 24.0f
+		),
+		IM_COL32(36, 26, 61, 225),
+		7.0f
+	);
+	draw->AddRect(
+		heroBadgePos,
+		ImVec2(
+			heroBadgePos.x + 152.0f,
+			heroBadgePos.y + 24.0f
+		),
+		IM_COL32(113, 73, 166, 190),
+		7.0f
+	);
+	draw->AddCircleFilled(
+		ImVec2(
+			heroBadgePos.x + 13.0f,
+			heroBadgePos.y + 12.0f
+		),
+		3.5f,
+		kPurpleBright
+	);
+	draw->AddText(
+		ImGui::GetFont(),
+		11.5f,
+		ImVec2(
+			heroBadgePos.x + 23.0f,
+			heroBadgePos.y + 5.0f
+		),
+		IM_COL32(206, 196, 225, 255),
+		"NEXUS DESKTOP CLIENT"
+	);
 
 	const char* welcomePrefix = "Welcome to";
 	const ImVec2 welcomePos(
 		origin.x + contentX,
-		origin.y + 96.0f
+		origin.y + 118.0f
 	);
+
 	draw->AddText(
 		ImGui::GetFont(),
-		34.0f,
+		36.0f,
 		welcomePos,
 		kText,
 		welcomePrefix
@@ -1029,7 +1073,7 @@ void UiController::DrawHome(
 
 	const float welcomeWidth =
 		ImGui::GetFont()->CalcTextSizeA(
-			34.0f,
+			36.0f,
 			FLT_MAX,
 			0.0f,
 			welcomePrefix
@@ -1037,7 +1081,7 @@ void UiController::DrawHome(
 
 	draw->AddText(
 		ImGui::GetFont(),
-		34.0f,
+		36.0f,
 		ImVec2(
 			welcomePos.x + welcomeWidth + 10.0f,
 			welcomePos.y
@@ -1049,44 +1093,57 @@ void UiController::DrawHome(
 	draw->AddText(
 		ImVec2(
 			origin.x + contentX,
-			origin.y + 138.0f
+			origin.y + 160.0f
 		),
 		kMuted,
 		"Authenticate, choose your product, and launch instantly."
 	);
 
-	const float top = 184.0f;
+	const float top = 198.0f;
 	const float gap = 18.0f;
 	const float authWidth =
 		contentWidth * 0.40f;
 	const float productsWidth =
 		contentWidth - authWidth - gap;
-	const float cardHeight = 292.0f;
-
-	ImGui::SetCursorPos(
-		ImVec2(contentX, top)
-	);
-	ImGui::BeginChild(
-		"##auth_panel",
-		ImVec2(authWidth, cardHeight),
-		true
-	);
-
-	ImGui::SetCursorPos(
-		ImVec2(18.0f, 17.0f)
-	);
-	DrawPanelHeader("[+]", "Authentication");
+	const float cardHeight = 286.0f;
 
 	AuthSnapshot snapshot{};
 	if (m_Auth) {
 		snapshot = m_Auth->Snapshot();
 	}
 
+	// Authentication card.
 	ImGui::SetCursorPos(
-		ImVec2(18.0f, 62.0f)
+		ImVec2(contentX, top)
+	);
+	ImGui::PushStyleColor(
+		ImGuiCol_ChildBg,
+		ImGui::ColorConvertU32ToFloat4(
+			kPanelSoft
+		)
+	);
+	ImGui::BeginChild(
+		"##auth_panel",
+		ImVec2(authWidth, cardHeight),
+		true
+	);
+	ImGui::PopStyleColor();
+
+	ImGui::SetCursorPos(
+		ImVec2(18.0f, 16.0f)
+	);
+	DrawPanelHeader("[SECURE]", "Authentication");
+
+	ImGui::SetCursorPos(
+		ImVec2(18.0f, 56.0f)
 	);
 
 	if (!snapshot.Authenticated) {
+		ImGui::TextDisabled("License Key");
+		ImGui::SetCursorPosY(
+			ImGui::GetCursorPosY() + 4.0f
+		);
+
 		ImGui::BeginDisabled(
 			!m_Auth ||
 			snapshot.Busy
@@ -1103,15 +1160,21 @@ void UiController::DrawHome(
 				ImGuiInputTextFlags_EnterReturnsTrue
 			);
 
-		ImGui::Spacing();
+		ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
 		const bool authenticate =
-			ImGui::Button(
-				"SIGN IN",
-				ImVec2(-18.0f, 42.0f)
+			PrimaryActionButton(
+				snapshot.Busy
+					? "CONNECTING..."
+					: "SIGN IN",
+				ImVec2(
+					ImGui::GetContentRegionAvail().x - 18.0f,
+					42.0f
+				),
+				!snapshot.Busy
 			);
 
-		ImGui::Spacing();
+		ImGui::Dummy(ImVec2(0.0f, 2.0f));
 		ImGui::Checkbox(
 			"Remember my key",
 			&m_Remember
@@ -1130,6 +1193,18 @@ void UiController::DrawHome(
 			);
 		}
 	} else {
+		draw->AddCircleFilled(
+			ImVec2(
+				ImGui::GetCursorScreenPos().x + 5.0f,
+				ImGui::GetCursorScreenPos().y + 8.0f
+			),
+			5.0f,
+			kGreen
+		);
+
+		ImGui::SetCursorPosX(
+			ImGui::GetCursorPosX() + 16.0f
+		);
 		ImGui::TextColored(
 			ImVec4(0.22f, 0.91f, 0.47f, 1.0f),
 			"Authenticated"
@@ -1138,21 +1213,35 @@ void UiController::DrawHome(
 			"Your license is active."
 		);
 
-		ImGui::Spacing();
-		if (!snapshot.Username.empty()) {
-			ImGui::Text(
-				"Account: %s",
-				snapshot.Username.c_str()
-			);
+		ImGui::Dummy(ImVec2(0.0f, 8.0f));
+
+		std::string account =
+			snapshot.Username.empty()
+				? "Account"
+				: snapshot.Username;
+
+		if (account.size() > 30) {
+			account =
+				account.substr(0, 20) +
+				"..." +
+				account.substr(
+					account.size() - 6
+				);
 		}
+
+		ImGui::TextDisabled("Account");
+		ImGui::Text("%s", account.c_str());
+
 		if (!snapshot.Subscription.empty()) {
-			ImGui::Text(
-				"Subscription: %s",
+			ImGui::SameLine();
+			ImGui::TextDisabled(
+				"  |  %s",
 				snapshot.Subscription.c_str()
 			);
 		}
+
 		if (!snapshot.Expiry.empty()) {
-			ImGui::Text(
+			ImGui::TextDisabled(
 				"Expires: %s",
 				snapshot.Expiry.c_str()
 			);
@@ -1160,27 +1249,72 @@ void UiController::DrawHome(
 	}
 
 	ImGui::SetCursorPos(
-		ImVec2(18.0f, cardHeight - 74.0f)
+		ImVec2(18.0f, cardHeight - 58.0f)
 	);
-	ImGui::BeginChild(
-		"##auth_status",
-		ImVec2(-18.0f, 56.0f),
-		true
+
+	const ImVec2 authStatusPos =
+		ImGui::GetCursorScreenPos();
+	const float authStatusWidth =
+		ImGui::GetContentRegionAvail().x - 18.0f;
+	const ImVec2 authStatusEnd(
+		authStatusPos.x + authStatusWidth,
+		authStatusPos.y + 40.0f
 	);
-	ImGui::TextColored(
-		StatusColor(snapshot),
-		"%s",
+
+	draw->AddRectFilled(
+		authStatusPos,
+		authStatusEnd,
+		kPanelRaised,
+		9.0f
+	);
+	draw->AddRect(
+		authStatusPos,
+		authStatusEnd,
+		IM_COL32(48, 55, 83, 230),
+		9.0f
+	);
+	draw->AddCircleFilled(
+		ImVec2(
+			authStatusPos.x + 15.0f,
+			authStatusPos.y + 20.0f
+		),
+		4.0f,
+		snapshot.Authenticated
+			? kGreen
+			: snapshot.State == AuthState::Error ||
+			  snapshot.State == AuthState::SessionInvalid
+				? kRed
+				: kPurpleBright
+	);
+	draw->AddText(
+		ImVec2(
+			authStatusPos.x + 28.0f,
+			authStatusPos.y + 11.0f
+		),
+		ImGui::ColorConvertFloat4ToU32(
+			StatusColor(snapshot)
+		),
 		snapshot.Authenticated
 			? "Authenticated"
 			: snapshot.Status.c_str()
 	);
-	ImGui::EndChild();
+	ImGui::Dummy(
+		ImVec2(authStatusWidth, 40.0f)
+	);
+
 	ImGui::EndChild();
 
+	// Products card.
 	ImGui::SetCursorPos(
 		ImVec2(
 			contentX + authWidth + gap,
 			top
+		)
+	);
+	ImGui::PushStyleColor(
+		ImGuiCol_ChildBg,
+		ImGui::ColorConvertU32ToFloat4(
+			kPanelSoft
 		)
 	);
 	ImGui::BeginChild(
@@ -1188,12 +1322,13 @@ void UiController::DrawHome(
 		ImVec2(productsWidth, cardHeight),
 		true
 	);
+	ImGui::PopStyleColor();
 
 	ImGui::SetCursorPos(
-		ImVec2(18.0f, 17.0f)
+		ImVec2(18.0f, 16.0f)
 	);
 	DrawPanelHeader(
-		"[ ]",
+		"[2 PRODUCTS]",
 		"Products Available"
 	);
 
@@ -1203,7 +1338,7 @@ void UiController::DrawHome(
 		2.0f;
 
 	ImGui::SetCursorPos(
-		ImVec2(18.0f, 60.0f)
+		ImVec2(18.0f, 56.0f)
 	);
 
 	for (
@@ -1223,7 +1358,10 @@ void UiController::DrawHome(
 		if (ProductTile(
 			product,
 			m_SelectedProduct == &product,
-			ImVec2(tileWidth, 205.0f)
+			ImVec2(
+				tileWidth,
+				210.0f
+			)
 		)) {
 			SelectProduct(product);
 		}
@@ -1231,6 +1369,7 @@ void UiController::DrawHome(
 
 	ImGui::EndChild();
 
+	// Launch panel.
 	const float launchTop =
 		top + cardHeight + 18.0f;
 	const float launchHeight =
@@ -1241,17 +1380,24 @@ void UiController::DrawHome(
 	ImGui::SetCursorPos(
 		ImVec2(contentX, launchTop)
 	);
+	ImGui::PushStyleColor(
+		ImGuiCol_ChildBg,
+		ImGui::ColorConvertU32ToFloat4(
+			kPanelSoft
+		)
+	);
 	ImGui::BeginChild(
 		"##launch_panel",
 		ImVec2(contentWidth, launchHeight),
 		true
 	);
+	ImGui::PopStyleColor();
 
 	ImGui::SetCursorPos(
-		ImVec2(20.0f, 18.0f)
+		ImVec2(20.0f, 16.0f)
 	);
 	DrawPanelHeader(
-		">",
+		"[ACTION]",
 		"Launch"
 	);
 
@@ -1261,7 +1407,7 @@ void UiController::DrawHome(
 			: "product";
 
 	ImGui::SetCursorPos(
-		ImVec2(20.0f, 50.0f)
+		ImVec2(20.0f, 46.0f)
 	);
 	ImGui::TextDisabled(
 		snapshot.Authenticated
@@ -1273,20 +1419,26 @@ void UiController::DrawHome(
 	const float buttonWidth = 220.0f;
 	ImGui::SetCursorPos(
 		ImVec2(
-			contentWidth - buttonWidth - 20.0f,
-			18.0f
+			contentWidth -
+				buttonWidth -
+				20.0f,
+			16.0f
 		)
 	);
 
-	ImGui::BeginDisabled(
-		!snapshot.Authenticated ||
-		snapshot.Busy ||
-		!m_SelectedProduct
-	);
+	const bool canLaunch =
+		snapshot.Authenticated &&
+		!snapshot.Busy &&
+		m_SelectedProduct &&
+		m_SelectedProduct->Configured;
 
-	if (ImGui::Button(
+	if (PrimaryActionButton(
 		"LAUNCH",
-		ImVec2(buttonWidth, 54.0f)
+		ImVec2(
+			buttonWidth,
+			54.0f
+		),
+		canLaunch
 	)) {
 		if (
 			m_SelectedProduct &&
@@ -1299,67 +1451,75 @@ void UiController::DrawHome(
 		}
 	}
 
-	ImGui::EndDisabled();
-
 	ImGui::SetCursorPos(
-		ImVec2(20.0f, 92.0f)
+		ImVec2(20.0f, 88.0f)
 	);
 
+	const float infoGap = 10.0f;
 	const float infoWidth =
-		(contentWidth - 56.0f) /
+		(contentWidth -
+			40.0f -
+			infoGap * 2.0f) /
 		3.0f;
 
-	ImGui::BeginChild(
-		"##game_info",
-		ImVec2(infoWidth, 62.0f),
-		true
-	);
-	ImGui::TextDisabled("Product");
-	ImGui::Text(
-		"%s",
+	DrawInfoCard(
+		"product",
+		"PRODUCT",
 		m_SelectedProduct
 			? m_SelectedProduct->DisplayName.data()
-			: "None"
+			: "None",
+		ImVec2(
+			infoWidth,
+			62.0f
+		)
 	);
-	ImGui::EndChild();
 
-	ImGui::SameLine();
-	ImGui::BeginChild(
-		"##config_info",
-		ImVec2(infoWidth, 62.0f),
-		true
+	ImGui::SameLine(
+		0.0f,
+		infoGap
 	);
-	ImGui::TextDisabled("Configuration");
-	ImGui::Text(
-		"%s",
+	DrawInfoCard(
+		"configuration",
+		"CONFIGURATION",
 		m_SelectedProduct &&
 		m_SelectedProduct->Configured
 			? "Ready"
-			: "Required"
+			: "Required",
+		ImVec2(
+			infoWidth,
+			62.0f
+		),
+		m_SelectedProduct &&
+		m_SelectedProduct->Configured
+			? kGreen
+			: kAmber
 	);
-	ImGui::EndChild();
 
-	ImGui::SameLine();
-	ImGui::BeginChild(
-		"##status_info",
-		ImVec2(infoWidth, 62.0f),
-		true
+	ImGui::SameLine(
+		0.0f,
+		infoGap
 	);
-	ImGui::TextDisabled("Status");
-	ImGui::TextColored(
-		snapshot.Authenticated
-			? ImVec4(0.22f, 0.91f, 0.47f, 1.0f)
-			: ImVec4(0.64f, 0.67f, 0.78f, 1.0f),
-		"%s",
+	DrawInfoCard(
+		"status",
+		"STATUS",
 		snapshot.Authenticated
 			? "Operational"
-			: "Waiting"
+			: "Waiting",
+		ImVec2(
+			infoWidth,
+			62.0f
+		),
+		snapshot.Authenticated
+			? kGreen
+			: kMuted
 	);
-	ImGui::EndChild();
 
 	if (!m_LaunchStatus.empty()) {
 		ImGui::SetCursorPos(
-			ImVec2(20.0f, launchHeight - 28.0f)
+			ImVec2(
+				20.0f,
+				launchHeight - 27.0f
+			)
 		);
 		ImGui::TextDisabled(
 			"%s",
