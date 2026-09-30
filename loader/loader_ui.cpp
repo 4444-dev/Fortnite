@@ -35,7 +35,7 @@ void DrawWindowChrome(bool& requestClose) {
 	ImGui::SetCursorPos(ImVec2(18.0f, 12.0f));
 	ImGui::TextUnformatted("LUVKRIMES // MULTI LOADER");
 
-	ImGui::SetCursorPos(ImVec2(588.0f, 8.0f));
+	ImGui::SetCursorPos(ImVec2(windowSize.x - 32.0f, 8.0f));
 
 	if (ImGui::Button("X", ImVec2(24.0f, 22.0f))) {
 		requestClose = true;
@@ -194,12 +194,22 @@ void UiController::DrawProductSelection() {
 	ImGui::Separator();
 	ImGui::Spacing();
 
-	const ImVec2 cardSize(250.0f, 148.0f);
+	constexpr float cardWidth = 250.0f;
+	constexpr float cardHeight = 148.0f;
+	const ImVec2 cardSize(cardWidth, cardHeight);
+	const float spacing = ImGui::GetStyle().ItemSpacing.x;
+	const float availableWidth = ImGui::GetContentRegionAvail().x;
+	const std::size_t columns = (std::max)(
+		std::size_t{1},
+		static_cast<std::size_t>(
+			(availableWidth + spacing) / (cardWidth + spacing)
+		)
+	);
 
 	for (std::size_t index = 0; index < Products.size(); ++index) {
 		const auto& product = Products[index];
 
-		if (index > 0) {
+		if (index > 0 && index % columns != 0) {
 			ImGui::SameLine();
 		}
 
