@@ -74,12 +74,18 @@ A separate `loader/luvkrimes-loader.vcxproj` project provides a dark ImGui authe
 
 The KeyAuth SDK is not vendored into this repository. The loader's pre-build step runs `scripts/bootstrap-keyauth.ps1`, which fetches the official KeyAuth 1.3 C++ library at pinned commit `486c83e6259f508ba0396f3156e50792a34a4576`. The optional upstream `Security.hpp` and `killEmulator.hpp` modules are removed after bootstrap, leaving normal authentication/session behavior without optional anti-analysis or emulator-killing logic.
 
-Loader configuration:
-- application: `Timocod18ytb's Application`
-- owner ID: `ZOhORJsXc1`
-- version: `1.0`
-- API: `https://keyauth.win/api/1.3/`
+The loader is now product-driven through `loader/product_registry.hpp`. Each product owns an independent KeyAuth configuration, an independent remembered-license file, and an independent launch target.
 
-The loader supports license-key authentication, 60-second session revalidation, and optional remembered-license storage using Windows DPAPI. Remembered license material is encrypted for the current Windows account and is not stored as plaintext.
+Current products:
+- **Fortnite** — configured against KeyAuth application `Timocod18ytb's Application`, owner ID `ZOhORJsXc1`, version `1.0`.
+- **Apex Legends** — present in the product selector but intentionally marked `configuration required` until its own separate KeyAuth application identifiers are supplied.
 
-For a generic post-authentication launch, set the `LUVKRIMES_TARGET` environment variable to the full path of the signed executable you want the loader to start. No injection, process hiding, anti-debugging, VM detection, or driver concealment is performed by the loader.
+Fortnite and Apex must use different KeyAuth applications if their key pools must be isolated. A Fortnite key is therefore sent only to the Fortnite KeyAuth application; an Apex key will be sent only to the Apex KeyAuth application once Apex is configured.
+
+The loader supports license-key authentication, 60-second session revalidation, and optional remembered-license storage using Windows DPAPI. Remembered license material is split by product under `%LOCALAPPDATA%\luvkrimes\licenses\<product>.dat`, encrypted for the current Windows account, and is never loaded across products.
+
+Post-authentication launch targets are product-specific:
+- `LUVKRIMES_TARGET_FORTNITE`
+- `LUVKRIMES_TARGET_APEX`
+
+Adding another project later only requires a new entry in `product_registry.hpp` with its own KeyAuth application configuration and target variable. No injection, process hiding, anti-debugging, VM detection, or driver concealment is performed by the loader.
