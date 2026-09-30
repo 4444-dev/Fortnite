@@ -30,12 +30,27 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
         with:
           msbuild-architecture: x64
+
+      - name: Verify KeyAuth bootstrap repeatability
+        if: matrix.configuration == 'Debug'
+        shell: pwsh
+        run: |
+          & ".\scripts\bootstrap-keyauth.ps1"
+          $authPath = ".\thirdparty\keyauth\auth.cpp"
+          $first = (Get-FileHash -LiteralPath $authPath -Algorithm SHA256).Hash
+
+          & ".\scripts\bootstrap-keyauth.ps1"
+          $second = (Get-FileHash -LiteralPath $authPath -Algorithm SHA256).Hash
+
+          if ($first -ne $second) {
+            throw "KeyAuth bootstrap is not repeatable."
+          }
 
       - name: Build application
         shell: pwsh
