@@ -33,7 +33,7 @@ public:
 		m_Root =
 			std::filesystem::temp_directory_path() /
 			(
-				L"luvkrimes-loader-tests-" +
+				L"nexus-loader-tests-" +
 				std::to_wstring(GetCurrentProcessId())
 			);
 
@@ -79,7 +79,7 @@ public:
 	) const {
 		return
 			m_Root /
-			L"luvkrimes" /
+			L"Nexus" /
 			L"licenses" /
 			std::filesystem::path(std::string(slug) + ".dat");
 	}
@@ -119,7 +119,7 @@ bool RunProductRegistryTests() {
 	);
 	ok &= Check(
 		loader::Fortnite.PackagedTargetRelativePath ==
-			L"projects\\fortnite\\Luvkrimes-Fortnite.exe",
+			L"projects\\fortnite\\Nexus-Fortnite.exe",
 		"Fortnite packaged target path"
 	);
 	ok &= Check(
@@ -138,6 +138,21 @@ bool RunProductRegistryTests() {
 		loader::Fortnite.TargetEnvironmentVariable !=
 			loader::ApexLegends.TargetEnvironmentVariable,
 		"product launch targets isolated"
+	);
+	ok &= Check(
+		loader::Fortnite.TargetEnvironmentVariable ==
+			L"NEXUS_TARGET_FORTNITE",
+		"Nexus Fortnite launch override"
+	);
+	ok &= Check(
+		loader::Fortnite.LegacyTargetEnvironmentVariable ==
+			L"LUVKRIMES_TARGET_FORTNITE",
+		"legacy Fortnite launch override retained"
+	);
+	ok &= Check(
+		loader::ApexLegends.TargetEnvironmentVariable ==
+			L"NEXUS_TARGET_APEX",
+		"Nexus Apex launch override"
 	);
 	ok &= Check(
 		loader::IsValidProductSlug("fortnite"),
@@ -182,8 +197,8 @@ bool RunLicenseStoreTests() {
 		return false;
 	}
 
-	constexpr std::string_view slug = "luvkrimes-ci-test";
-	constexpr std::string_view otherSlug = "luvkrimes-ci-other";
+	constexpr std::string_view slug = "nexus-ci-test";
+	constexpr std::string_view otherSlug = "nexus-ci-other";
 	const std::string value = "test-license-value";
 
 	loader::license_store::Clear(slug);
