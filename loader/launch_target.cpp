@@ -105,26 +105,44 @@ bool LaunchConfiguredTarget(
 
 	std::filesystem::path path;
 
-	if (!product.TargetEnvironmentVariable.empty()) {
-		const std::wstring variable(product.TargetEnvironmentVariable);
-		wchar_t overrideTarget[32768]{};
+	const auto readOverride =
+		[&path, &message](std::wstring_view variable) {
+			if (variable.empty()) {
+				return true;
+			}
 
-		SetLastError(ERROR_SUCCESS);
-		const DWORD count = GetEnvironmentVariableW(
-			variable.c_str(),
-			overrideTarget,
-			static_cast<DWORD>(_countof(overrideTarget))
-		);
+			const std::wstring name(variable);
+			wchar_t overrideTarget[32768]{};
 
-		if (count >= _countof(overrideTarget)) {
-			message =
-				"Configured target path exceeds the Windows path buffer.";
-			return false;
-		}
+			SetLastError(ERROR_SUCCESS);
+			const DWORD count = GetEnvironmentVariableW(
+				name.c_str(),
+				overrideTarget,
+				static_cast<DWORD>(_countof(overrideTarget))
+			);
 
-		if (count > 0) {
-			path = overrideTarget;
-		}
+			if (count >= _countof(overrideTarget)) {
+				message =
+					"Configured target path exceeds the Windows path buffer.";
+				return false;
+			}
+
+			if (count > 0) {
+				path = overrideTarget;
+			}
+
+			return true;
+		};
+
+	if (!readOverride(product.TargetEnvironmentVariable)) {
+		return false;
+	}
+
+	if (
+		path.empty() &&
+		!readOverride(product.LegacyTargetEnvironmentVariable)
+	) {
+		return false;
 	}
 
 	if (path.empty()) {
@@ -168,7 +186,7 @@ bool LaunchConfiguredTarget(
 
 	if (!isFile) {
 		message =
-			"Product executable was not found. Reinstall Luvkrimes or "
+			"Product executable was not found. Reinstall Nexus or "
 			"configure the product launch override.";
 		return false;
 	}
