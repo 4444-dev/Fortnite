@@ -1,0 +1,215 @@
+name: Publish release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish ${{ github.ref_name }}
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release tag and main ancestry
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -notmatch '^v(\d+)\.(\d+)\.(\d+)([-.][0-9A-Za-z.-]+)?$') {
+            throw "Release tag must use semantic versioning, for example v1.0.0."
+          }
+
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor HEAD origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw "Release tags must point to a commit already present on main."
+          }
+
+          $version = $tag.Substring(1)
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
+        with:
+          msbuild-architecture: x64
+
+      - name: Verify KeyAuth bootstrap repeatability
+        shell: pwsh
+        run: |
+          & ".\scripts\bootstrap-keyauth.ps1"
+          $authPath = ".\thirdparty\keyauth\auth.cpp"
+          $first = (Get-FileHash -LiteralPath $authPath -Algorithm SHA256).Hash
+
+          & ".\scripts\bootstrap-keyauth.ps1"
+          $second = (Get-FileHash -LiteralPath $authPath -Algorithm SHA256).Hash
+
+          if ($first -ne $second) {
+            throw "KeyAuth bootstrap is not repeatable."
+          }
+
+      - name: Build application
+        shell: pwsh
+        run: |
+          msbuild ".\luvkrimes base\luvkrimes base.vcxproj" /m /p:Configuration=Release /p:Platform=x64 /p:PreferredToolArchitecture=x64 /verbosity:minimal
+
+      - name: Build loader
+        shell: pwsh
+        run: |
+          msbuild ".\loader\luvkrimes-loader.vcxproj" /m /p:Configuration=Release /p:Platform=x64 /p:PreferredToolArchitecture=x64 /verbosity:minimal
+
+      - name: Build regression tests
+        shell: pwsh
+        run: |
+          msbuild ".\tests\luvkrimes-tests.vcxproj" /m /p:Configuration=Release /p:Platform=x64 /p:PreferredToolArchitecture=x64 /verbosity:minimal
+
+      - name: Run regression tests twice
+        shell: pwsh
+        run: |
+          $testExecutable = ".\tests\bin\x64\Release\luvkrimes-tests.exe"
+          foreach ($attempt in 1..2) {
+            & $testExecutable
+            if ($LASTEXITCODE -ne 0) {
+              throw "Regression test pass $attempt failed with exit code $LASTEXITCODE."
+            }
+          }
+
+      - name: Prepare optional code-signing certificate
+        if: env.WINDOWS_CERTIFICATE_BASE64 != ''
+        id: signing
+        shell: pwsh
+        run: |
+          $certificatePath = Join-Path $env:RUNNER_TEMP "luvkrimes-signing.pfx"
+          [IO.File]::WriteAllBytes(
+            $certificatePath,
+            [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64)
+          )
+
+          $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+
+          if (-not $signTool) {
+            throw "signtool.exe was not found."
+          }
+
+          "certificate=$certificatePath" >> $env:GITHUB_OUTPUT
+          "signtool=$($signTool.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Sign release binaries
+        if: env.WINDOWS_CERTIFICATE_BASE64 != ''
+        shell: pwsh
+        run: |
+          $targets = @(
+            ".\loader\bin\x64\Release\luvkrimes-loader.exe",
+            ".\luvkrimes base\x64\Release\luvkrimes base.exe"
+          )
+
+          foreach ($target in $targets) {
+            & "${{ steps.signing.outputs.signtool }}" sign /fd SHA256 /f "${{ steps.signing.outputs.certificate }}" /p "$env:WINDOWS_CERTIFICATE_PASSWORD" /tr "http://timestamp.digicert.com" /td SHA256 $target
+            if ($LASTEXITCODE -ne 0) {
+              throw "Code signing failed for $target."
+            }
+          }
+
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis --version=3.12.0 --yes --no-progress
+
+      - name: Package installer and portable build
+        shell: pwsh
+        run: |
+          & ".\scripts\package-release.ps1" -Version "${{ steps.version.outputs.version }}"
+
+      - name: Sign installer
+        if: env.WINDOWS_CERTIFICATE_BASE64 != ''
+        shell: pwsh
+        run: |
+          $installer = ".\dist\Luvkrimes-Setup-${{ steps.version.outputs.version }}.exe"
+          & "${{ steps.signing.outputs.signtool }}" sign /fd SHA256 /f "${{ steps.signing.outputs.certificate }}" /p "$env:WINDOWS_CERTIFICATE_PASSWORD" /tr "http://timestamp.digicert.com" /td SHA256 $installer
+          if ($LASTEXITCODE -ne 0) {
+            throw "Installer code signing failed."
+          }
+
+          $assets = @(
+            $installer,
+            ".\dist\Luvkrimes-Portable-${{ steps.version.outputs.version }}.zip"
+          )
+          $lines = foreach ($asset in $assets) {
+            $hash = Get-FileHash -LiteralPath $asset -Algorithm SHA256
+            "{0}  {1}" -f $hash.Hash.ToLowerInvariant(), (Split-Path -Leaf $asset)
+          }
+          Set-Content -LiteralPath ".\dist\SHA256SUMS.txt" -Value $lines -Encoding ascii
+
+      - name: Test packaged installer
+        shell: pwsh
+        run: |
+          $installer = (Resolve-Path ".\dist\Luvkrimes-Setup-${{ steps.version.outputs.version }}.exe").Path
+          $installDir = Join-Path $env:RUNNER_TEMP "luvkrimes-release-install"
+
+          if (Test-Path -LiteralPath $installDir) {
+            Remove-Item -LiteralPath $installDir -Recurse -Force
+          }
+
+          $install = Start-Process -FilePath $installer -ArgumentList @("/S", "/D=$installDir") -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            throw "Release installer failed with exit code $($install.ExitCode)."
+          }
+
+          $required = @(
+            (Join-Path $installDir "Luvkrimes.exe"),
+            (Join-Path $installDir "projects\fortnite\Luvkrimes-Fortnite.exe"),
+            (Join-Path $installDir "Uninstall.exe")
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Release installer is missing: $path"
+            }
+          }
+
+          $uninstall = Start-Process -FilePath (Join-Path $installDir "Uninstall.exe") -ArgumentList "/S" -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0) {
+            throw "Release uninstaller failed with exit code $($uninstall.ExitCode)."
+          }
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = "${{ steps.version.outputs.version }}"
+          $assets = @(
+            ".\dist\Luvkrimes-Setup-$version.exe",
+            ".\dist\Luvkrimes-Portable-$version.zip",
+            ".\dist\SHA256SUMS.txt"
+          )
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag @assets --clobber
+          } else {
+            gh release create $tag @assets --verify-tag --generate-notes --title "Luvkrimes $tag"
+          }
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub Release publication failed."
+          }
