@@ -49,8 +49,8 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <PreprocessorDefinitions>_DEBUG;CURL_STATICLIB;SODIUM_STATIC;WIN32_LEAN_AND_MEAN;NOMINMAX;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\luvkrimes base;$(ProjectDir)..\luvkrimes base\thirdparty\imgui;$(ProjectDir)..\luvkrimes base\thirdparty\imgui\backends;$(ProjectDir)..\thirdparty\keyauth;$(ProjectDir)..\thirdparty\keyauth\curl;$(ProjectDir)..\thirdparty\keyauth\libsodium;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_DEBUG;SODIUM_STATIC;WIN32_LEAN_AND_MEAN;NOMINMAX;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\thirdparty\keyauth;$(ProjectDir)..\thirdparty\keyauth\curl;$(ProjectDir)..\thirdparty\keyauth\libsodium;$(ProjectDir);$(ProjectDir)..\luvkrimes base;$(ProjectDir)..\luvkrimes base\thirdparty\imgui;$(ProjectDir)..\luvkrimes base\thirdparty\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -71,8 +71,8 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NDEBUG;CURL_STATICLIB;SODIUM_STATIC;WIN32_LEAN_AND_MEAN;NOMINMAX;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\luvkrimes base;$(ProjectDir)..\luvkrimes base\thirdparty\imgui;$(ProjectDir)..\luvkrimes base\thirdparty\imgui\backends;$(ProjectDir)..\thirdparty\keyauth;$(ProjectDir)..\thirdparty\keyauth\curl;$(ProjectDir)..\thirdparty\keyauth\libsodium;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NDEBUG;SODIUM_STATIC;WIN32_LEAN_AND_MEAN;NOMINMAX;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\thirdparty\keyauth;$(ProjectDir)..\thirdparty\keyauth\curl;$(ProjectDir)..\thirdparty\keyauth\libsodium;$(ProjectDir);$(ProjectDir)..\luvkrimes base;$(ProjectDir)..\luvkrimes base\thirdparty\imgui;$(ProjectDir)..\luvkrimes base\thirdparty\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
