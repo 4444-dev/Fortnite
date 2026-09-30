@@ -127,6 +127,10 @@ void KeyValueConfig::SetInt(std::string key, int value) {
 }
 
 void KeyValueConfig::SetFloat(std::string key, float value) {
+	if (!std::isfinite(value)) {
+		value = 0.0f;
+	}
+
 	char buffer[64]{};
 	const auto result = std::to_chars(
 		buffer,
