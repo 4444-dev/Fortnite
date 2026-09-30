@@ -259,8 +259,14 @@ void Clear(std::string_view productSlug) {
 		return;
 	}
 
+	const auto path = StoragePath(productSlug);
 	std::error_code error;
-	std::filesystem::remove(StoragePath(productSlug), error);
+	std::filesystem::remove(path, error);
+
+	std::filesystem::path temporary = path;
+	temporary += L".tmp";
+	error.clear();
+	std::filesystem::remove(temporary, error);
 }
 
 } // namespace loader::license_store
