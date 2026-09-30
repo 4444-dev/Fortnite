@@ -35,7 +35,7 @@ void DrawWindowChrome(bool& requestClose) {
 	);
 
 	ImGui::SetCursorPos(ImVec2(18.0f, 12.0f));
-	ImGui::TextUnformatted("LUVKRIMES // MULTI LOADER");
+	ImGui::TextUnformatted("NEXUS // MULTI LOADER");
 
 	ImGui::SetCursorPos(ImVec2(windowSize.x - 32.0f, 8.0f));
 
