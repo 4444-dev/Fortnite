@@ -289,13 +289,6 @@ struct DxState {
 
 DxState g_Dx{};
 
-void ReleaseCom(IUnknown*& object) {
-	if (object) {
-		object->Release();
-		object = nullptr;
-	}
-}
-
 void DestroyRenderTarget() {
 	if (g_Dx.Target) {
 		g_Dx.Target->Release();
@@ -362,12 +355,9 @@ bool CreateDevice(HWND hwnd) {
 
 void CleanupDevice() {
 	DestroyRenderTarget();
-	IUnknown* swapChain = g_Dx.SwapChain;
-	IUnknown* context = g_Dx.Context;
-	IUnknown* device = g_Dx.Device;
-	ReleaseCom(swapChain);
-	ReleaseCom(context);
-	ReleaseCom(device);
+	if (g_Dx.SwapChain) g_Dx.SwapChain->Release();
+	if (g_Dx.Context) g_Dx.Context->Release();
+	if (g_Dx.Device) g_Dx.Device->Release();
 	g_Dx.SwapChain = nullptr;
 	g_Dx.Context = nullptr;
 	g_Dx.Device = nullptr;
