@@ -69,6 +69,30 @@ if ($authText.Contains($unguarded)) {
     Set-Content -Path $authCpp -Value $authText -NoNewline
 }
 
+# Upstream Tfa::handleInput() is declared to return Tfa& but currently falls
+# through without a return. Add the missing return so MSVC can compile it.
+$tfaTail = @'
+		instance.disable2fa(code);
+	}
+
+}
+
+void KeyAuth::api::web_login()
+'@
+$tfaFixed = @'
+		instance.disable2fa(code);
+	}
+
+    return *this;
+}
+
+void KeyAuth::api::web_login()
+'@
+if ($authText.Contains($tfaTail)) {
+    $authText = $authText.Replace($tfaTail, $tfaFixed)
+    Set-Content -Path $authCpp -Value $authText -NoNewline
+}
+
 $actual = Get-CurrentCommit
 if ($actual -ne $pinnedCommit) {
     throw "KeyAuth bootstrap verification failed. Expected $pinnedCommit, got $actual."
