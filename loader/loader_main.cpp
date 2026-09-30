@@ -1,7 +1,7 @@
+#include "auth_controller.hpp"
+#include "launch_target.hpp"
 #include "license_store.hpp"
 #include "product_registry.hpp"
-
-#include <auth.hpp>
 
 #include <Windows.h>
 #include <windowsx.h>
@@ -45,239 +45,6 @@ constexpr int kWindowHeight = 390;
 enum class Screen {
 	ProductSelect,
 	Authentication
-};
-
-enum class AuthState {
-	Connecting,
-	Ready,
-	Authenticating,
-	Authenticated,
-	Error,
-	SessionInvalid
-};
-
-struct AuthSnapshot {
-	AuthState State = AuthState::Connecting;
-	std::string Status = "Connecting to authentication service...";
-	std::string Username;
-	std::string Subscription;
-	std::string Expiry;
-	bool Busy = true;
-	bool Authenticated = false;
-};
-
-class AuthController final {
-public:
-	explicit AuthController(const loader::ProductDefinition& product)
-		: m_Product(product),
-		  m_App(
-			std::string(product.KeyAuthName),
-			std::string(product.KeyAuthOwnerId),
-			std::string(product.KeyAuthVersion),
-			std::string(product.KeyAuthUrl),
-			std::string(product.KeyAuthPath)
-		  ) {
-	}
-
-	~AuthController() {
-		JoinWorker();
-	}
-
-	AuthController(const AuthController&) = delete;
-	AuthController& operator=(const AuthController&) = delete;
-
-	void Initialize() {
-		Run(
-			AuthState::Connecting,
-			"Connecting to " + std::string(m_Product.DisplayName) + "...",
-			[this] {
-				m_App.init();
-
-				std::scoped_lock lock(m_Mutex);
-				if (!m_App.response.success) {
-					m_Snapshot.State = AuthState::Error;
-					m_Snapshot.Status = m_App.response.message.empty()
-						? "Authentication initialization failed."
-						: m_App.response.message;
-					m_Snapshot.Authenticated = false;
-					return;
-				}
-
-				m_Snapshot.State = AuthState::Ready;
-				m_Snapshot.Status =
-					"Ready. Enter your " +
-					std::string(m_Product.DisplayName) +
-					" license key.";
-				m_Snapshot.Authenticated = false;
-			}
-		);
-	}
-
-	void Authenticate(std::string license, bool remember) {
-		if (license.empty()) {
-			std::scoped_lock lock(m_Mutex);
-			m_Snapshot.State = AuthState::Error;
-			m_Snapshot.Status = "Enter a license key.";
-			return;
-		}
-
-		Run(
-			AuthState::Authenticating,
-			"Validating " + std::string(m_Product.DisplayName) + " license...",
-			[this, license = std::move(license), remember] {
-				// This KeyAuth::api instance was created from the selected
-				// product's independent KeyAuth application configuration.
-				m_App.license(license);
-
-				std::scoped_lock lock(m_Mutex);
-				if (!m_App.response.success) {
-					m_Snapshot.State = AuthState::Error;
-					m_Snapshot.Status = m_App.response.message.empty()
-						? "License validation failed."
-						: m_App.response.message;
-					m_Snapshot.Authenticated = false;
-					return;
-				}
-
-				m_Snapshot.State = AuthState::Authenticated;
-				m_Snapshot.Status =
-					std::string(m_Product.DisplayName) +
-					" authentication successful.";
-				m_Snapshot.Authenticated = true;
-				m_Snapshot.Username = m_App.user_data.username;
-
-				if (!m_App.user_data.subscriptions.empty()) {
-					const auto& subscription =
-						m_App.user_data.subscriptions.front();
-					m_Snapshot.Subscription = subscription.name;
-					m_Snapshot.Expiry = subscription.expiry;
-				} else {
-					m_Snapshot.Subscription.clear();
-					m_Snapshot.Expiry.clear();
-				}
-
-				if (remember) {
-					(void)loader::license_store::Save(
-						m_Product.Slug,
-						license
-					);
-				} else {
-					loader::license_store::Clear(m_Product.Slug);
-				}
-
-				m_NextSessionCheck =
-					std::chrono::steady_clock::now() +
-					std::chrono::seconds(60);
-			}
-		);
-	}
-
-	void Tick() {
-		const AuthSnapshot snapshot = Snapshot();
-
-		if (
-			!snapshot.Authenticated ||
-			snapshot.Busy ||
-			std::chrono::steady_clock::now() < m_NextSessionCheck
-		) {
-			return;
-		}
-
-		Run(
-			AuthState::Authenticated,
-			std::string(m_Product.DisplayName) + " session active.",
-			[this] {
-				m_App.check();
-
-				std::scoped_lock lock(m_Mutex);
-				if (!m_App.response.success) {
-					m_Snapshot.State = AuthState::SessionInvalid;
-					m_Snapshot.Status = m_App.response.message.empty()
-						? "Session validation failed."
-						: m_App.response.message;
-					m_Snapshot.Authenticated = false;
-					return;
-				}
-
-				m_Snapshot.State = AuthState::Authenticated;
-				m_Snapshot.Status =
-					std::string(m_Product.DisplayName) +
-					" session active.";
-				m_Snapshot.Authenticated = true;
-
-				m_NextSessionCheck =
-					std::chrono::steady_clock::now() +
-					std::chrono::seconds(60);
-			}
-		);
-	}
-
-	[[nodiscard]] AuthSnapshot Snapshot() const {
-		std::scoped_lock lock(m_Mutex);
-		return m_Snapshot;
-	}
-
-private:
-	template <typename Fn>
-	void Run(
-		AuthState state,
-		std::string status,
-		Fn&& fn
-	) {
-		if (m_Busy.exchange(true)) {
-			return;
-		}
-
-		JoinWorker();
-
-		{
-			std::scoped_lock lock(m_Mutex);
-			m_Snapshot.State = state;
-			m_Snapshot.Status = std::move(status);
-			m_Snapshot.Busy = true;
-		}
-
-		m_Worker = std::thread(
-			[this, task = std::forward<Fn>(fn)]() mutable {
-				try {
-					task();
-				} catch (const std::exception& exception) {
-					std::scoped_lock lock(m_Mutex);
-					m_Snapshot.State = AuthState::Error;
-					m_Snapshot.Status = exception.what();
-					m_Snapshot.Authenticated = false;
-				} catch (...) {
-					std::scoped_lock lock(m_Mutex);
-					m_Snapshot.State = AuthState::Error;
-					m_Snapshot.Status =
-						"Unexpected authentication error.";
-					m_Snapshot.Authenticated = false;
-				}
-
-				{
-					std::scoped_lock lock(m_Mutex);
-					m_Snapshot.Busy = false;
-				}
-
-				m_Busy.store(false);
-			}
-		);
-	}
-
-	void JoinWorker() {
-		if (m_Worker.joinable()) {
-			m_Worker.join();
-		}
-	}
-
-	const loader::ProductDefinition& m_Product;
-	KeyAuth::api m_App;
-
-	mutable std::mutex m_Mutex;
-	AuthSnapshot m_Snapshot{};
-	std::thread m_Worker;
-	std::atomic<bool> m_Busy{false};
-	std::chrono::steady_clock::time_point m_NextSessionCheck{};
 };
 
 struct DxState {
@@ -487,73 +254,6 @@ void ApplyStyle() {
 		ImVec4(0.48f, 0.48f, 0.52f, 1.0f);
 }
 
-bool LaunchConfiguredTarget(
-	const loader::ProductDefinition& product,
-	std::string& message
-) {
-	wchar_t target[32768]{};
-
-	const DWORD count = GetEnvironmentVariableW(
-		product.TargetEnvironmentVariable.data(),
-		target,
-		static_cast<DWORD>(_countof(target))
-	);
-
-	if (count == 0 || count >= _countof(target)) {
-		message =
-			"Authenticated. Configure " +
-			std::string(product.Slug) +
-			"'s launch target with its dedicated environment variable.";
-		return false;
-	}
-
-	const std::filesystem::path path(target);
-
-	if (!std::filesystem::is_regular_file(path)) {
-		message = "Configured target executable was not found.";
-		return false;
-	}
-
-	std::wstring command =
-		L"\"" + path.wstring() + L"\"";
-
-	std::vector<wchar_t> mutableCommand(
-		command.begin(),
-		command.end()
-	);
-	mutableCommand.push_back(L'\0');
-
-	STARTUPINFOW startup{};
-	startup.cb = sizeof(startup);
-
-	PROCESS_INFORMATION process{};
-
-	if (!CreateProcessW(
-		path.c_str(),
-		mutableCommand.data(),
-		nullptr,
-		nullptr,
-		FALSE,
-		0,
-		nullptr,
-		path.parent_path().c_str(),
-		&startup,
-		&process
-	)) {
-		message = "Failed to start configured target executable.";
-		return false;
-	}
-
-	CloseHandle(process.hThread);
-	CloseHandle(process.hProcess);
-
-	message =
-		std::string(product.DisplayName) +
-		" target launched.";
-
-	return true;
-}
-
 void DrawWindowChrome(bool& requestClose) {
 	ImDrawList* draw = ImGui::GetWindowDrawList();
 
@@ -723,19 +423,21 @@ void LoadRememberedLicense(
 
 void DrawAuthentication(
 	const loader::ProductDefinition& product,
-	AuthController& auth,
+	loader::AuthController& auth,
 	std::array<char, 192>& license,
 	bool& remember,
 	bool& goBack,
 	bool& requestClose
 ) {
-	const AuthSnapshot snapshot = auth.Snapshot();
+	const loader::AuthSnapshot snapshot = auth.Snapshot();
 
 	ImGui::SetCursorPos(ImVec2(34.0f, 61.0f));
 
+	ImGui::BeginDisabled(snapshot.Busy);
 	if (ImGui::Button("< PRODUCTS", ImVec2(112.0f, 28.0f))) {
 		goBack = true;
 	}
+	ImGui::EndDisabled();
 
 	ImGui::SetCursorPos(ImVec2(34.0f, 100.0f));
 
@@ -831,7 +533,7 @@ void DrawAuthentication(
 			"LAUNCH",
 			ImVec2(-1.0f, 38.0f)
 		)) {
-			if (LaunchConfiguredTarget(product, launchStatus)) {
+			if (loader::LaunchConfiguredTarget(product, launchStatus)) {
 				requestClose = true;
 			}
 		}
@@ -940,7 +642,7 @@ int WINAPI wWinMain(
 	Screen screen = Screen::ProductSelect;
 	const loader::ProductDefinition* selectedProduct = nullptr;
 
-	std::unique_ptr<AuthController> auth;
+	std::unique_ptr<loader::AuthController> auth;
 	std::array<char, 192> license{};
 	bool remember = true;
 
@@ -1003,7 +705,7 @@ int WINAPI wWinMain(
 				);
 
 				auth =
-					std::make_unique<AuthController>(
+					std::make_unique<loader::AuthController>(
 						*selectedProduct
 					);
 
