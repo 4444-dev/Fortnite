@@ -17,16 +17,17 @@ constexpr float kSidebarWidth = 214.0f;
 constexpr float kTopBarHeight = 66.0f;
 constexpr float kContentPadding = 24.0f;
 
-constexpr ImU32 kBg = IM_COL32(8, 9, 17, 255);
-constexpr ImU32 kPanel = IM_COL32(13, 15, 27, 245);
-constexpr ImU32 kPanelAlt = IM_COL32(16, 18, 32, 245);
-constexpr ImU32 kBorder = IM_COL32(38, 42, 65, 255);
-constexpr ImU32 kPurple = IM_COL32(138, 55, 255, 255);
-constexpr ImU32 kPurpleBright = IM_COL32(183, 64, 255, 255);
+constexpr ImU32 kBg = IM_COL32(8, 10, 18, 255);
+constexpr ImU32 kPanel = IM_COL32(16, 20, 33, 248);
+constexpr ImU32 kPanelAlt = IM_COL32(21, 26, 43, 248);
+constexpr ImU32 kBorder = IM_COL32(39, 45, 69, 255);
+constexpr ImU32 kPurple = IM_COL32(139, 61, 255, 255);
+constexpr ImU32 kPurpleBright = IM_COL32(182, 92, 255, 255);
 constexpr ImU32 kText = IM_COL32(242, 243, 249, 255);
-constexpr ImU32 kMuted = IM_COL32(160, 166, 196, 255);
+constexpr ImU32 kMuted = IM_COL32(168, 175, 195, 255);
 constexpr ImU32 kGreen = IM_COL32(57, 232, 121, 255);
-constexpr ImU32 kRed = IM_COL32(245, 87, 103, 255);
+constexpr ImU32 kRed = IM_COL32(255, 92, 112, 255);
+constexpr ImU32 kAmber = IM_COL32(247, 185, 85, 255);
 
 void DrawLogo(ImDrawList* draw, const ImVec2& pos) {
 	draw->AddText(
@@ -307,12 +308,16 @@ bool ProductTile(
 					? "Fortnite.exe"
 					: "Apex-Radar.exe")
 			: !product.PackagedTargetRelativePath.empty()
-				? "Radar inclus - KeyAuth requis"
+				? "Radar Included - KeyAuth Required"
 				: "Configuration requise";
 
 	draw->AddText(
 		ImVec2(start.x + 16.0f, end.y - 29.0f),
-		product.Configured ? kMuted : kRed,
+		product.Configured
+			? kMuted
+			: !product.PackagedTargetRelativePath.empty()
+				? kAmber
+				: kRed,
 		executable.c_str()
 	);
 
@@ -360,14 +365,14 @@ UiController::~UiController() {
 void ApplyLoaderStyle() {
 	ImGuiStyle& style = ImGui::GetStyle();
 
-	style.WindowRounding = 14.0f;
+	style.WindowRounding = 16.0f;
 	style.ChildRounding = 12.0f;
-	style.FrameRounding = 8.0f;
-	style.PopupRounding = 10.0f;
-	style.GrabRounding = 8.0f;
+	style.FrameRounding = 10.0f;
+	style.PopupRounding = 12.0f;
+	style.GrabRounding = 10.0f;
 	style.WindowPadding = ImVec2(0.0f, 0.0f);
-	style.FramePadding = ImVec2(12.0f, 9.0f);
-	style.ItemSpacing = ImVec2(10.0f, 10.0f);
+	style.FramePadding = ImVec2(13.0f, 10.0f);
+	style.ItemSpacing = ImVec2(12.0f, 12.0f);
 	style.ItemInnerSpacing = ImVec2(8.0f, 7.0f);
 	style.WindowBorderSize = 1.0f;
 	style.ChildBorderSize = 1.0f;
@@ -527,7 +532,7 @@ void UiController::DrawSidebar() {
 	);
 
 	if (NavItem(
-		"Accueil",
+		"Home",
 		0,
 		m_Page == Page::Home
 	)) {
@@ -536,7 +541,7 @@ void UiController::DrawSidebar() {
 
 	ImGui::SetCursorPosX(14.0f);
 	if (NavItem(
-		"Produits",
+		"Products",
 		1,
 		m_Page == Page::Products
 	)) {
@@ -545,7 +550,7 @@ void UiController::DrawSidebar() {
 
 	ImGui::SetCursorPosX(14.0f);
 	if (NavItem(
-		"Parametres",
+		"Settings",
 		2,
 		m_Page == Page::Settings
 	)) {
@@ -554,7 +559,7 @@ void UiController::DrawSidebar() {
 
 	ImGui::SetCursorPosX(14.0f);
 	if (NavItem(
-		"A propos",
+		"About",
 		3,
 		m_Page == Page::About
 	)) {
@@ -564,10 +569,18 @@ void UiController::DrawSidebar() {
 	draw->AddText(
 		ImVec2(
 			origin.x + 22.0f,
-			origin.y + size.y - 42.0f
+			origin.y + size.y - 54.0f
 		),
 		IM_COL32(106, 111, 141, 255),
 		"NEXUS CLIENT"
+	);
+	draw->AddText(
+		ImVec2(
+			origin.x + 22.0f,
+			origin.y + size.y - 34.0f
+		),
+		IM_COL32(84, 90, 114, 255),
+		"BUILD 1.0.5"
 	);
 }
 
@@ -618,13 +631,13 @@ void UiController::DrawHeader(
 
 	const char* keyAuthText =
 		snapshot.Authenticated
-			? "KeyAuth : Connecte"
+			? "KeyAuth Connected"
 			: snapshot.State == AuthState::Error ||
 			  snapshot.State == AuthState::SessionInvalid
-				? "KeyAuth : Erreur"
+				? "KeyAuth Error"
 				: snapshot.State == AuthState::Connecting
-					? "KeyAuth : Connexion..."
-					: "KeyAuth : Pret";
+					? "Connecting..."
+					: "KeyAuth Ready";
 
 	ImGui::SetCursorPos(
 		ImVec2(
@@ -634,8 +647,8 @@ void UiController::DrawHeader(
 	);
 	DrawStatusPill(
 		serviceOnline
-			? "Service en ligne"
-			: "Service indisponible",
+			? "Service Online"
+			: "Service Offline",
 		serviceOnline ? kGreen : kRed,
 		142.0f
 	);
@@ -724,23 +737,33 @@ void UiController::DrawHome(
 		);
 	}
 
+	const char* welcomePrefix = "Welcome to";
+	const ImVec2 welcomePos(
+		origin.x + contentX,
+		origin.y + 96.0f
+	);
 	draw->AddText(
 		ImGui::GetFont(),
 		34.0f,
-		ImVec2(
-			origin.x + contentX,
-			origin.y + 96.0f
-		),
+		welcomePos,
 		kText,
-		"Bienvenue sur"
+		welcomePrefix
 	);
+
+	const float welcomeWidth =
+		ImGui::GetFont()->CalcTextSizeA(
+			34.0f,
+			FLT_MAX,
+			0.0f,
+			welcomePrefix
+		).x;
 
 	draw->AddText(
 		ImGui::GetFont(),
 		34.0f,
 		ImVec2(
-			origin.x + contentX + 211.0f,
-			origin.y + 96.0f
+			welcomePos.x + welcomeWidth + 10.0f,
+			welcomePos.y
 		),
 		kPurpleBright,
 		"Nexus"
@@ -752,7 +775,7 @@ void UiController::DrawHome(
 			origin.y + 138.0f
 		),
 		kMuted,
-		"Authentifiez-vous, choisissez votre produit et lancez."
+		"Authenticate, choose your product, and launch instantly."
 	);
 
 	const float top = 184.0f;
@@ -775,7 +798,7 @@ void UiController::DrawHome(
 	ImGui::SetCursorPos(
 		ImVec2(18.0f, 17.0f)
 	);
-	DrawPanelHeader("[+]", "Authentification");
+	DrawPanelHeader("[+]", "Authentication");
 
 	AuthSnapshot snapshot{};
 	if (m_Auth) {
@@ -796,7 +819,7 @@ void UiController::DrawHome(
 		const bool submitted =
 			ImGui::InputTextWithHint(
 				"##license",
-				"Entrez votre cle d'activation...",
+				"Enter your activation key...",
 				m_License.data(),
 				m_License.size(),
 				ImGuiInputTextFlags_Password |
@@ -807,13 +830,13 @@ void UiController::DrawHome(
 
 		const bool authenticate =
 			ImGui::Button(
-				"CONNEXION",
+				"SIGN IN",
 				ImVec2(-18.0f, 42.0f)
 			);
 
 		ImGui::Spacing();
 		ImGui::Checkbox(
-			"Se souvenir de ma cle",
+			"Remember my key",
 			&m_Remember
 		);
 
@@ -832,28 +855,28 @@ void UiController::DrawHome(
 	} else {
 		ImGui::TextColored(
 			ImVec4(0.22f, 0.91f, 0.47f, 1.0f),
-			"Authentifie"
+			"Authenticated"
 		);
 		ImGui::TextDisabled(
-			"Votre licence est valide."
+			"Your license is active."
 		);
 
 		ImGui::Spacing();
 		if (!snapshot.Username.empty()) {
 			ImGui::Text(
-				"Utilisateur : %s",
+				"Account: %s",
 				snapshot.Username.c_str()
 			);
 		}
 		if (!snapshot.Subscription.empty()) {
 			ImGui::Text(
-				"Abonnement : %s",
+				"Subscription: %s",
 				snapshot.Subscription.c_str()
 			);
 		}
 		if (!snapshot.Expiry.empty()) {
 			ImGui::Text(
-				"Expiration : %s",
+				"Expires: %s",
 				snapshot.Expiry.c_str()
 			);
 		}
@@ -871,7 +894,7 @@ void UiController::DrawHome(
 		StatusColor(snapshot),
 		"%s",
 		snapshot.Authenticated
-			? "Authentifie"
+			? "Authenticated"
 			: snapshot.Status.c_str()
 	);
 	ImGui::EndChild();
@@ -894,7 +917,7 @@ void UiController::DrawHome(
 	);
 	DrawPanelHeader(
 		"[ ]",
-		"Produits disponibles"
+		"Products Available"
 	);
 
 	const float tileGap = 14.0f;
@@ -952,7 +975,7 @@ void UiController::DrawHome(
 	);
 	DrawPanelHeader(
 		">",
-		"Lancement"
+		"Launch"
 	);
 
 	const char* productName =
@@ -965,8 +988,8 @@ void UiController::DrawHome(
 	);
 	ImGui::TextDisabled(
 		snapshot.Authenticated
-			? "Pret a lancer %s avec votre configuration Nexus."
-			: "Authentifiez-vous pour activer le lancement de %s.",
+			? "Ready to launch %s with your Nexus configuration."
+			: "Authenticate first to enable launching %s.",
 		productName
 	);
 
@@ -985,7 +1008,7 @@ void UiController::DrawHome(
 	);
 
 	if (ImGui::Button(
-		"LANCER",
+		"LAUNCH",
 		ImVec2(buttonWidth, 54.0f)
 	)) {
 		if (
@@ -1014,12 +1037,12 @@ void UiController::DrawHome(
 		ImVec2(infoWidth, 62.0f),
 		true
 	);
-	ImGui::TextDisabled("Produit");
+	ImGui::TextDisabled("Product");
 	ImGui::Text(
 		"%s",
 		m_SelectedProduct
 			? m_SelectedProduct->DisplayName.data()
-			: "Aucun"
+			: "None"
 	);
 	ImGui::EndChild();
 
@@ -1034,8 +1057,8 @@ void UiController::DrawHome(
 		"%s",
 		m_SelectedProduct &&
 		m_SelectedProduct->Configured
-			? "Prete"
-			: "Requise"
+			? "Ready"
+			: "Required"
 	);
 	ImGui::EndChild();
 
@@ -1045,15 +1068,15 @@ void UiController::DrawHome(
 		ImVec2(infoWidth, 62.0f),
 		true
 	);
-	ImGui::TextDisabled("Statut");
+	ImGui::TextDisabled("Status");
 	ImGui::TextColored(
 		snapshot.Authenticated
 			? ImVec4(0.22f, 0.91f, 0.47f, 1.0f)
 			: ImVec4(0.64f, 0.67f, 0.78f, 1.0f),
 		"%s",
 		snapshot.Authenticated
-			? "Operationnel"
-			: "En attente"
+			? "Operational"
+			: "Waiting"
 	);
 	ImGui::EndChild();
 
@@ -1083,9 +1106,9 @@ void UiController::DrawProducts() {
 	ImGui::SetCursorPos(
 		ImVec2(contentX, 96.0f)
 	);
-	ImGui::Text("Produits");
+	ImGui::Text("Products");
 	ImGui::TextDisabled(
-		"Selectionnez le projet a utiliser avec Nexus."
+		"Manage the products available through Nexus."
 	);
 
 	ImGui::SetCursorPos(
@@ -1145,9 +1168,9 @@ void UiController::DrawSettings() {
 	ImGui::SetCursorPos(
 		ImVec2(contentX, 96.0f)
 	);
-	ImGui::Text("Parametres");
+	ImGui::Text("Settings");
 	ImGui::TextDisabled(
-		"Preferences locales du client Nexus."
+		"Local preferences for the Nexus client."
 	);
 
 	ImGui::SetCursorPos(
@@ -1163,22 +1186,22 @@ void UiController::DrawSettings() {
 		ImVec2(20.0f, 20.0f)
 	);
 	ImGui::Checkbox(
-		"Memoriser ma cle sur ce compte Windows",
+		"Remember my key on this device",
 		&m_Remember
 	);
 
 	ImGui::Spacing();
 	ImGui::TextDisabled(
-		"Les licences memorisees sont protegees par Windows DPAPI."
+		"Stored keys are protected locally with Windows DPAPI."
 	);
 	ImGui::TextDisabled(
-		"Donnees locales : %%LOCALAPPDATA%%\\Nexus"
+		"Local data: %%LOCALAPPDATA%%\\Nexus"
 	);
 
 	if (m_SelectedProduct) {
 		ImGui::Spacing();
 		ImGui::Text(
-			"Produit actif : %s",
+			"Active product: %s",
 			m_SelectedProduct->DisplayName.data()
 		);
 	}
@@ -1199,9 +1222,9 @@ void UiController::DrawAbout() {
 	ImGui::SetCursorPos(
 		ImVec2(contentX, 96.0f)
 	);
-	ImGui::Text("A propos");
+	ImGui::Text("About");
 	ImGui::TextDisabled(
-		"Nexus client"
+		"Nexus Client"
 	);
 
 	ImGui::SetCursorPos(
@@ -1222,13 +1245,12 @@ void UiController::DrawAbout() {
 	);
 	ImGui::Spacing();
 	ImGui::TextWrapped(
-		"Client multi-produit avec authentification KeyAuth, "
-		"licences isolees par produit et lancement depuis une "
-		"installation ou un package portable."
+		"Multi-product desktop client with isolated product licensing, "
+		"KeyAuth authentication, and installed or portable launch support."
 	);
 	ImGui::Spacing();
 	ImGui::TextDisabled(
-		"Les projets non configures restent volontairement desactives."
+		"Products without authentication configuration remain intentionally disabled."
 	);
 
 	ImGui::EndChild();
