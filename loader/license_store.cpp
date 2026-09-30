@@ -173,6 +173,7 @@ bool Load(
 	if (!file) {
 		return false;
 	}
+	file.close();
 
 	DATA_BLOB input{};
 	input.pbData = encrypted.data();
