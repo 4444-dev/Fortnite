@@ -65,7 +65,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\luvkrimes base;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\luvkrimes base;$(ProjectDir)..\loader;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
@@ -77,6 +77,7 @@
 
   <ItemGroup>
     <ClCompile Include="config_tests.cpp" />
+    <ClCompile Include="..\loader\launch_target.cpp" />
     <ClCompile Include="..\luvkrimes base\workspace\util\config\kv_config.cpp" />
   </ItemGroup>
 
