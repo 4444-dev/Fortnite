@@ -20,12 +20,12 @@ public:
 	Window(const Window&) = delete;
 	Window& operator=(const Window&) = delete;
 
-	bool Create();
+	bool Create(DWORD targetProcessId);
 	void Destroy();
 
 	[[nodiscard]] HWND Handle() const noexcept;
 	[[nodiscard]] bool PumpMessages() const;
-	[[nodiscard]] bool SyncToVirtualDesktop();
+	[[nodiscard]] bool SyncToTargetMonitor();
 	[[nodiscard]] SIZE ClientSize() const noexcept;
 	[[nodiscard]] float DpiScale() const noexcept;
 
@@ -39,11 +39,13 @@ private:
 		LPARAM lparam
 	);
 
-	[[nodiscard]] static RECT VirtualDesktopBounds() noexcept;
+	[[nodiscard]] RECT TargetMonitorBounds() const noexcept;
+	[[nodiscard]] HWND TargetWindow() const noexcept;
 
 	HWND m_Hwnd = nullptr;
 	HINSTANCE m_Instance = nullptr;
 	bool m_OwnsClass = false;
+	DWORD m_TargetProcessId = 0;
 };
 
 } // namespace overlay
