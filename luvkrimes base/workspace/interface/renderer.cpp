@@ -175,6 +175,9 @@ void Renderer::Shutdown() {
 }
 
 void Renderer::BeginFrame() {
+	if (!IsReady()) {
+		return;
+	}
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
@@ -195,6 +198,9 @@ bool Renderer::EndFrame() {
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
 	const HRESULT result = m_SwapChain->Present(0, 0);
+	if (result == DXGI_STATUS_OCCLUDED) {
+		return true;
+	}
 	if (FAILED(result)) {
 		logger::Log(
 			"[renderer] Present failed (hr=0x%08lX)",
