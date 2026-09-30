@@ -29,6 +29,29 @@ namespace {
 		const auto Scale = Projection.M [ 0 ][ 0 ];
 		Next.FOV = static_cast< float >( 2.0 * std::atan( 1.0 / Scale ) * 180.0 / PI );
 
+		const auto finiteVector = []( const FVector& V ) {
+			return std::isfinite( V.X ) && std::isfinite( V.Y ) && std::isfinite( V.Z );
+		};
+		if ( !finiteVector( Next.AxisRight ) || !finiteVector( Next.AxisUp ) || !finiteVector( Next.AxisForward ) )
+			return false;
+
+		const double RightLenSq = Next.AxisRight.SizeSquared( );
+		const double UpLenSq = Next.AxisUp.SizeSquared( );
+		const double ForwardLenSq = Next.AxisForward.SizeSquared( );
+		if ( RightLenSq < 0.81 || RightLenSq > 1.21 || UpLenSq < 0.81 || UpLenSq > 1.21 || ForwardLenSq < 0.81 || ForwardLenSq > 1.21 )
+			return false;
+		if ( std::fabs( Next.AxisRight.Dot( Next.AxisUp ) ) > 0.15 ||
+			std::fabs( Next.AxisRight.Dot( Next.AxisForward ) ) > 0.15 ||
+			std::fabs( Next.AxisUp.Dot( Next.AxisForward ) ) > 0.15 )
+			return false;
+
+		for ( i32 Row = 0; Row < 4; ++Row ) {
+			for ( i32 Col = 0; Col < 4; ++Col ) {
+				if ( !std::isfinite( View.ViewProjectionMatrix.M [ Row ][ Col ] ) )
+					return false;
+			}
+		}
+
 		const double LocationSquared = Next.Location.SizeSquared( );
 		if ( !std::isfinite( Scale ) || Scale <= 0.0 || Scale > 1000.0 )
 			return false;
