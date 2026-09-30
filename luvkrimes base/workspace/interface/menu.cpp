@@ -91,7 +91,7 @@ bool Switch(const char* id, bool* value) {
 
 	draw->AddRectFilled(
 		pos,
-		pos + size,
+		ImVec2(pos.x + size.x, pos.y + size.y),
 		track,
 		11.0f
 	);
@@ -848,7 +848,10 @@ void menu::render(
 
 	draw->AddRect(
 		windowPos,
-		windowPos + windowSize,
+		ImVec2(
+			windowPos.x + windowSize.x,
+			windowPos.y + windowSize.y
+		),
 		palette::border,
 		12.0f,
 		0,
