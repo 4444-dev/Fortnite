@@ -32,8 +32,14 @@ bool NearlyEqual(double a, double b, double epsilon = 1e-9) {
 bool RunProductRegistryTests() {
 	bool ok = true;
 	ok &= Check(loader::RegistryIsValid(), "product registry invariants");
-	ok &= Check(loader::FindProduct(loader::ProductId::Fortnite) == &loader::Fortnite, "find Fortnite product");
-	ok &= Check(loader::FindProduct(loader::ProductId::ApexLegends) == &loader::ApexLegends, "find Apex product");
+	const auto* fortnite = loader::FindProduct(loader::ProductId::Fortnite);
+	const auto* apex = loader::FindProduct(loader::ProductId::ApexLegends);
+	ok &= Check(fortnite && fortnite->Id == loader::ProductId::Fortnite &&
+		fortnite->Slug == loader::Fortnite.Slug && fortnite->Configured == loader::Fortnite.Configured,
+		"find Fortnite product");
+	ok &= Check(apex && apex->Id == loader::ProductId::ApexLegends &&
+		apex->Slug == loader::ApexLegends.Slug && apex->Configured == loader::ApexLegends.Configured,
+		"find Apex product");
 	ok &= Check(loader::Fortnite.Configured, "Fortnite configured");
 	ok &= Check(!loader::ApexLegends.Configured, "Apex remains disabled until configured");
 	ok &= Check(loader::Fortnite.Slug != loader::ApexLegends.Slug, "product slugs isolated");
