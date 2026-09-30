@@ -17,7 +17,7 @@ int WINAPI wWinMain(
 		MessageBoxW(
 			nullptr,
 			L"Unable to create the loader window.",
-			L"luvkrimes loader",
+			L"Nexus",
 			MB_OK | MB_ICONERROR
 		);
 		return 1;
@@ -29,7 +29,7 @@ int WINAPI wWinMain(
 		MessageBoxW(
 			window.Handle(),
 			L"Unable to initialize the Direct3D 11 renderer.",
-			L"luvkrimes loader",
+			L"Nexus",
 			MB_OK | MB_ICONERROR
 		);
 		return 1;
@@ -70,7 +70,7 @@ int WINAPI wWinMain(
 		MessageBoxW(
 			window.Handle(),
 			L"The renderer stopped unexpectedly. Restart the loader and check your graphics driver if the problem persists.",
-			L"luvkrimes loader",
+			L"Nexus",
 			MB_OK | MB_ICONERROR
 		);
 	}
