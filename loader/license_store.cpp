@@ -14,7 +14,6 @@
 namespace loader::license_store {
 namespace {
 
-
 std::filesystem::path RootPath() {
 	wchar_t buffer[32768]{};
 	const DWORD count = GetEnvironmentVariableW(
@@ -43,13 +42,35 @@ std::wstring Description(std::string_view productSlug) {
 	return std::wstring(text.begin(), text.end());
 }
 
+std::string Entropy(std::string_view productSlug) {
+	return
+		"luvkrimes-license-entropy-v1:" +
+		std::string(productSlug);
+}
+
+void ClearPlaintextBlob(DATA_BLOB& blob) noexcept {
+	if (blob.pbData && blob.cbData > 0) {
+		SecureZeroMemory(blob.pbData, blob.cbData);
+	}
+
+	if (blob.pbData) {
+		LocalFree(blob.pbData);
+	}
+
+	blob = {};
+}
+
 } // namespace
 
 bool Save(
 	std::string_view productSlug,
 	const std::string& license
 ) {
-	if (!IsValidProductSlug(productSlug) || license.empty() || license.size() > kMaxLicenseLength) {
+	if (
+		!IsValidProductSlug(productSlug) ||
+		license.empty() ||
+		license.size() > kMaxLicenseLength
+	) {
 		return false;
 	}
 
@@ -59,13 +80,18 @@ bool Save(
 	);
 	input.cbData = static_cast<DWORD>(license.size());
 
+	std::string entropyText = Entropy(productSlug);
+	DATA_BLOB entropy{};
+	entropy.pbData = reinterpret_cast<BYTE*>(entropyText.data());
+	entropy.cbData = static_cast<DWORD>(entropyText.size());
+
 	const std::wstring description = Description(productSlug);
 
 	DATA_BLOB output{};
 	if (!CryptProtectData(
 		&input,
 		description.c_str(),
-		nullptr,
+		&entropy,
 		nullptr,
 		nullptr,
 		CRYPTPROTECT_UI_FORBIDDEN,
@@ -113,6 +139,7 @@ bool Save(
 	}
 
 	LocalFree(output.pbData);
+	SecureZeroMemory(entropyText.data(), entropyText.size());
 	return success;
 }
 
@@ -151,20 +178,44 @@ bool Load(
 	input.pbData = encrypted.data();
 	input.cbData = static_cast<DWORD>(encrypted.size());
 
+	std::string entropyText = Entropy(productSlug);
+	DATA_BLOB entropy{};
+	entropy.pbData = reinterpret_cast<BYTE*>(entropyText.data());
+	entropy.cbData = static_cast<DWORD>(entropyText.size());
+
 	DATA_BLOB output{};
 	LPWSTR description = nullptr;
+	bool legacyFormat = false;
 
 	if (!CryptUnprotectData(
 		&input,
 		&description,
-		nullptr,
+		&entropy,
 		nullptr,
 		nullptr,
 		CRYPTPROTECT_UI_FORBIDDEN,
 		&output
 	)) {
-		return false;
+		output = {};
+		description = nullptr;
+
+		if (!CryptUnprotectData(
+			&input,
+			&description,
+			nullptr,
+			nullptr,
+			nullptr,
+			CRYPTPROTECT_UI_FORBIDDEN,
+			&output
+		)) {
+			SecureZeroMemory(entropyText.data(), entropyText.size());
+			return false;
+		}
+
+		legacyFormat = true;
 	}
+
+	SecureZeroMemory(entropyText.data(), entropyText.size());
 
 	const std::wstring expected = Description(productSlug);
 	const bool descriptionMatches =
@@ -176,12 +227,12 @@ bool Load(
 	}
 
 	if (!descriptionMatches) {
-		LocalFree(output.pbData);
+		ClearPlaintextBlob(output);
 		return false;
 	}
 
 	if (output.cbData == 0 || output.cbData > kMaxLicenseLength) {
-		LocalFree(output.pbData);
+		ClearPlaintextBlob(output);
 		return false;
 	}
 
@@ -189,9 +240,17 @@ bool Load(
 		reinterpret_cast<const char*>(output.pbData),
 		static_cast<std::size_t>(output.cbData)
 	);
-	LocalFree(output.pbData);
+	ClearPlaintextBlob(output);
 
-	return !license.empty();
+	if (license.empty()) {
+		return false;
+	}
+
+	if (legacyFormat) {
+		(void)Save(productSlug, license);
+	}
+
+	return true;
 }
 
 void Clear(std::string_view productSlug) {
