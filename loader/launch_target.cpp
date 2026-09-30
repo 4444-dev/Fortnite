@@ -98,35 +98,63 @@ bool LaunchConfiguredTarget(
 	const ProductDefinition& product,
 	std::string& message
 ) {
-	if (!product.Configured || product.TargetEnvironmentVariable.empty()) {
+	if (!product.Configured) {
 		message = "This product is not configured for launch.";
 		return false;
 	}
 
-	const std::wstring variable(product.TargetEnvironmentVariable);
-	wchar_t target[32768]{};
+	std::filesystem::path path;
 
-	SetLastError(ERROR_SUCCESS);
-	const DWORD count = GetEnvironmentVariableW(
-		variable.c_str(),
-		target,
-		static_cast<DWORD>(_countof(target))
-	);
+	if (!product.TargetEnvironmentVariable.empty()) {
+		const std::wstring variable(product.TargetEnvironmentVariable);
+		wchar_t overrideTarget[32768]{};
 
-	if (count == 0) {
-		message =
-			"Authenticated. Configure " +
-			std::string(product.Slug) +
-			"'s launch target with its dedicated environment variable.";
-		return false;
+		SetLastError(ERROR_SUCCESS);
+		const DWORD count = GetEnvironmentVariableW(
+			variable.c_str(),
+			overrideTarget,
+			static_cast<DWORD>(_countof(overrideTarget))
+		);
+
+		if (count >= _countof(overrideTarget)) {
+			message =
+				"Configured target path exceeds the Windows path buffer.";
+			return false;
+		}
+
+		if (count > 0) {
+			path = overrideTarget;
+		}
 	}
 
-	if (count >= _countof(target)) {
-		message = "Configured target path exceeds the Windows path buffer.";
-		return false;
+	if (path.empty()) {
+		if (product.PackagedTargetRelativePath.empty()) {
+			message =
+				"No packaged launch target is configured for this product.";
+			return false;
+		}
+
+		wchar_t modulePath[32768]{};
+		const DWORD moduleLength = GetModuleFileNameW(
+			nullptr,
+			modulePath,
+			static_cast<DWORD>(_countof(modulePath))
+		);
+
+		if (
+			moduleLength == 0 ||
+			moduleLength >= _countof(modulePath)
+		) {
+			message =
+				"Unable to resolve the loader installation directory.";
+			return false;
+		}
+
+		path =
+			std::filesystem::path(modulePath).parent_path() /
+			std::filesystem::path(product.PackagedTargetRelativePath);
 	}
 
-	const std::filesystem::path path(target);
 	std::error_code fileError;
 	const bool isFile = std::filesystem::is_regular_file(path, fileError);
 
@@ -139,21 +167,29 @@ bool LaunchConfiguredTarget(
 	}
 
 	if (!isFile) {
-		message = "Configured target executable was not found.";
+		message =
+			"Product executable was not found. Reinstall Luvkrimes or "
+			"configure the product launch override.";
 		return false;
 	}
 
 	std::wstring command = L"\"" + path.wstring() + L"\"";
-	std::vector<wchar_t> mutableCommand(command.begin(), command.end());
+	std::vector<wchar_t> mutableCommand(
+		command.begin(),
+		command.end()
+	);
 	mutableCommand.push_back(L'\0');
 
 	STARTUPINFOW startup{};
 	startup.cb = sizeof(startup);
 
 	PROCESS_INFORMATION process{};
-	const std::filesystem::path workingDirectory = path.parent_path();
+	const std::filesystem::path workingDirectory =
+		path.parent_path();
 	const wchar_t* currentDirectory =
-		workingDirectory.empty() ? nullptr : workingDirectory.c_str();
+		workingDirectory.empty()
+			? nullptr
+			: workingDirectory.c_str();
 
 	if (!CreateProcessW(
 		path.c_str(),
@@ -178,7 +214,9 @@ bool LaunchConfiguredTarget(
 	CloseHandle(process.hThread);
 	CloseHandle(process.hProcess);
 
-	message = std::string(product.DisplayName) + " target launched.";
+	message =
+		std::string(product.DisplayName) +
+		" target launched.";
 	return true;
 }
 
