@@ -14,6 +14,7 @@ using i32 = int32_t;
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 
 namespace {
 
@@ -60,6 +61,16 @@ bool RunMathTests() {
 	ok &= Check(identity.WorldToScreen({1.0, 1.0, 0.0}, 1920.0, 1080.0, screen) &&
 		NearlyEqual(screen.X, 1920.0) && NearlyEqual(screen.Y, 0.0), "identity projection upper-right");
 	ok &= Check(!identity.WorldToScreen({0.0, 0.0, 0.0}, 0.0, 1080.0, screen), "reject zero-width viewport");
+
+	FMatrix invalidW = identity;
+	invalidW.M14 = std::numeric_limits<double>::quiet_NaN();
+	ok &= Check(!invalidW.WorldToScreen({1.0, 0.0, 0.0}, 1920.0, 1080.0, screen),
+		"reject non-finite clip W");
+
+	FMatrix invalidX = identity;
+	invalidX.M11 = std::numeric_limits<double>::infinity();
+	ok &= Check(!invalidX.WorldToScreen({1.0, 0.0, 0.0}, 1920.0, 1080.0, screen),
+		"reject non-finite projected coordinate");
 
 	FMatrix behind = identity;
 	behind.M44 = -1.0;
@@ -158,7 +169,10 @@ int main() {
 			<< " valid = 7 \n"
 			<< "flag=false\n"
 			<< "broken-line\n"
-			<< "invalid_int=nope\n";
+			<< "invalid_int=nope\n"
+			<< "invalid_float=nan\n"
+			<< "trailing_float=1.25oops\n"
+			<< "invalid_bool=yes\n";
 	}
 
 	util::KeyValueConfig parsed;
@@ -169,6 +183,9 @@ int main() {
 	int valid = 0;
 	int invalid = 123;
 	bool flag = true;
+	bool invalidBool = false;
+	float invalidFloat = 0.0f;
+	float trailingFloat = 0.0f;
 
 	if (!Check(parsed.TryGetInt("valid", valid) && valid == 7, "trim whitespace")) {
 		return 1;
@@ -177,6 +194,15 @@ int main() {
 		return 1;
 	}
 	if (!Check(!parsed.TryGetInt("invalid_int", invalid), "reject invalid integer")) {
+		return 1;
+	}
+	if (!Check(!parsed.TryGetFloat("invalid_float", invalidFloat), "reject non-finite float")) {
+		return 1;
+	}
+	if (!Check(!parsed.TryGetFloat("trailing_float", trailingFloat), "reject float with trailing data")) {
+		return 1;
+	}
+	if (!Check(!parsed.TryGetBool("invalid_bool", invalidBool), "reject invalid boolean")) {
 		return 1;
 	}
 	if (!Check(!parsed.GetString("broken-line"), "ignore malformed line")) {
