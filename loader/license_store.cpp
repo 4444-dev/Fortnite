@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <string>
 #include <vector>
 
 #pragma comment(lib, "Crypt32.lib")
@@ -12,7 +13,27 @@
 namespace loader::license_store {
 namespace {
 
-std::filesystem::path StoragePath() {
+bool ValidSlug(std::string_view slug) {
+	if (slug.empty() || slug.size() > 64) {
+		return false;
+	}
+
+	for (const char ch : slug) {
+		const bool valid =
+			(ch >= 'a' && ch <= 'z') ||
+			(ch >= '0' && ch <= '9') ||
+			ch == '-' ||
+			ch == '_';
+
+		if (!valid) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+std::filesystem::path RootPath() {
 	wchar_t buffer[32768]{};
 	const DWORD count = GetEnvironmentVariableW(
 		L"LOCALAPPDATA",
@@ -25,13 +46,28 @@ std::filesystem::path StoragePath() {
 		root = buffer;
 	}
 
-	return root / L"luvkrimes" / L"license.dat";
+	return root / L"luvkrimes" / L"licenses";
+}
+
+std::filesystem::path StoragePath(std::string_view productSlug) {
+	return RootPath() /
+		std::filesystem::path(std::string(productSlug) + ".dat");
+}
+
+std::wstring Description(std::string_view productSlug) {
+	const std::string text =
+		"luvkrimes-license-" + std::string(productSlug);
+
+	return std::wstring(text.begin(), text.end());
 }
 
 } // namespace
 
-bool Save(const std::string& license) {
-	if (license.empty()) {
+bool Save(
+	std::string_view productSlug,
+	const std::string& license
+) {
+	if (!ValidSlug(productSlug) || license.empty()) {
 		return false;
 	}
 
@@ -41,10 +77,12 @@ bool Save(const std::string& license) {
 	);
 	input.cbData = static_cast<DWORD>(license.size());
 
+	const std::wstring description = Description(productSlug);
+
 	DATA_BLOB output{};
 	if (!CryptProtectData(
 		&input,
-		L"luvkrimes-license",
+		description.c_str(),
 		nullptr,
 		nullptr,
 		nullptr,
@@ -54,19 +92,41 @@ bool Save(const std::string& license) {
 		return false;
 	}
 
-	const auto path = StoragePath();
+	const auto path = StoragePath(productSlug);
 	std::error_code error;
 	std::filesystem::create_directories(path.parent_path(), error);
 
 	bool success = false;
 	if (!error) {
-		std::ofstream file(path, std::ios::binary | std::ios::trunc);
-		if (file) {
-			file.write(
-				reinterpret_cast<const char*>(output.pbData),
-				static_cast<std::streamsize>(output.cbData)
+		std::filesystem::path temporary = path;
+		temporary += L".tmp";
+
+		{
+			std::ofstream file(
+				temporary,
+				std::ios::binary | std::ios::trunc
 			);
-			success = file.good();
+
+			if (file) {
+				file.write(
+					reinterpret_cast<const char*>(output.pbData),
+					static_cast<std::streamsize>(output.cbData)
+				);
+				file.flush();
+				success = file.good();
+			}
+		}
+
+		if (success) {
+			success = MoveFileExW(
+				temporary.c_str(),
+				path.c_str(),
+				MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+			) != FALSE;
+		}
+
+		if (!success) {
+			std::filesystem::remove(temporary, error);
 		}
 	}
 
@@ -74,8 +134,17 @@ bool Save(const std::string& license) {
 	return success;
 }
 
-bool Load(std::string& license) {
-	const auto path = StoragePath();
+bool Load(
+	std::string_view productSlug,
+	std::string& license
+) {
+	license.clear();
+
+	if (!ValidSlug(productSlug)) {
+		return false;
+	}
+
+	const auto path = StoragePath(productSlug);
 	std::ifstream file(path, std::ios::binary | std::ios::ate);
 	if (!file) {
 		return false;
@@ -101,15 +170,31 @@ bool Load(std::string& license) {
 	input.cbData = static_cast<DWORD>(encrypted.size());
 
 	DATA_BLOB output{};
+	LPWSTR description = nullptr;
+
 	if (!CryptUnprotectData(
 		&input,
-		nullptr,
+		&description,
 		nullptr,
 		nullptr,
 		nullptr,
 		CRYPTPROTECT_UI_FORBIDDEN,
 		&output
 	)) {
+		return false;
+	}
+
+	const std::wstring expected = Description(productSlug);
+	const bool descriptionMatches =
+		description &&
+		expected == description;
+
+	if (description) {
+		LocalFree(description);
+	}
+
+	if (!descriptionMatches) {
+		LocalFree(output.pbData);
 		return false;
 	}
 
@@ -122,9 +207,13 @@ bool Load(std::string& license) {
 	return !license.empty();
 }
 
-void Clear() {
+void Clear(std::string_view productSlug) {
+	if (!ValidSlug(productSlug)) {
+		return;
+	}
+
 	std::error_code error;
-	std::filesystem::remove(StoragePath(), error);
+	std::filesystem::remove(StoragePath(productSlug), error);
 }
 
 } // namespace loader::license_store
