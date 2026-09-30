@@ -8,6 +8,7 @@ using u16 = uint16_t;
 using u8 = uint8_t;
 using i32 = int32_t;
 #include <workspace/game/unreal/structures.hpp>
+#include "../loader/product_registry.hpp"
 
 #include <cmath>
 #include <filesystem>
@@ -26,6 +27,19 @@ bool Check(bool condition, const char* message) {
 
 bool NearlyEqual(double a, double b, double epsilon = 1e-9) {
 	return std::fabs(a - b) <= epsilon;
+}
+
+bool RunProductRegistryTests() {
+	bool ok = true;
+	ok &= Check(loader::RegistryIsValid(), "product registry invariants");
+	ok &= Check(loader::FindProduct(loader::ProductId::Fortnite) == &loader::Fortnite, "find Fortnite product");
+	ok &= Check(loader::FindProduct(loader::ProductId::ApexLegends) == &loader::ApexLegends, "find Apex product");
+	ok &= Check(loader::Fortnite.Configured, "Fortnite configured");
+	ok &= Check(!loader::ApexLegends.Configured, "Apex remains disabled until configured");
+	ok &= Check(loader::Fortnite.Slug != loader::ApexLegends.Slug, "product slugs isolated");
+	ok &= Check(loader::Fortnite.TargetEnvironmentVariable != loader::ApexLegends.TargetEnvironmentVariable,
+		"product launch targets isolated");
+	return ok;
 }
 
 bool RunMathTests() {
@@ -64,6 +78,7 @@ bool RunMathTests() {
 } // namespace
 
 int main() {
+	if (!RunProductRegistryTests()) return 1;
 	if (!RunMathTests()) return 1;
 
 	const auto path =
@@ -165,6 +180,6 @@ int main() {
 	std::error_code error;
 	std::filesystem::remove(path, error);
 
-	std::cout << "All config tests passed.\n";
+	std::cout << "All tests passed.\n";
 	return 0;
 }
