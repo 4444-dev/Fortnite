@@ -8,6 +8,8 @@
 #include <workspace/interface/window.hpp>
 #include <workspace/util/logger/logger.hpp>
 
+#include <chrono>
+
 namespace overlay {
 namespace {
 
@@ -52,6 +54,10 @@ bool RunLoop(
 ) {
 	InputManager input;
 	bool menuOpen = true;
+	window.SetClickThrough(false);
+
+	auto nextMonitorSync =
+		std::chrono::steady_clock::now();
 
 	while (window.PumpMessages()) {
 		if (input.PressedOnce(menu::cfg.menu_key)) {
@@ -63,17 +69,25 @@ bool RunLoop(
 			}
 		}
 
-		if (window.SyncToVirtualDesktop()) {
-			const SIZE size = window.ClientSize();
-			if (
-				size.cx > 0 &&
-				size.cy > 0 &&
-				!renderer.Resize(
-					static_cast<UINT>(size.cx),
-					static_cast<UINT>(size.cy)
-				)
-			) {
-				return false;
+		const auto now =
+			std::chrono::steady_clock::now();
+
+		if (now >= nextMonitorSync) {
+			nextMonitorSync =
+				now + std::chrono::milliseconds(250);
+
+			if (window.SyncToTargetMonitor()) {
+				const SIZE size = window.ClientSize();
+				if (
+					size.cx > 0 &&
+					size.cy > 0 &&
+					!renderer.Resize(
+						static_cast<UINT>(size.cx),
+						static_cast<UINT>(size.cy)
+					)
+				) {
+					return false;
+				}
 			}
 		}
 
@@ -131,7 +145,7 @@ bool RunLoop(
 
 } // namespace
 
-bool run(PlayerCache& players, CameraCache& camera) {
+bool run(PlayerCache& players, CameraCache& camera, std::uint32_t targetProcessId) {
 	if (app_settings::Load(menu::cfg)) {
 		logger::Log(
 			"[settings] loaded from %ls",
@@ -142,7 +156,7 @@ bool run(PlayerCache& players, CameraCache& camera) {
 	}
 
 	Window window;
-	if (!window.Create()) {
+	if (!window.Create(static_cast<DWORD>(targetProcessId))) {
 		logger::Log("[overlay] window creation failed");
 		return false;
 	}

@@ -41,6 +41,10 @@ CI builds the package on every Release configuration and performs a silent insta
 `.github/workflows/release.yml` publishes automatically when `release/VERSION` changes on `main`. The workflow builds, tests, packages, installs and uninstalls the client package before publishing the matching semantic-version release. The published assets are the Nexus installer, portable ZIP and checksum file.
 
 Authenticode signing is optional. If repository secrets `WINDOWS_CERTIFICATE_BASE64` and `WINDOWS_CERTIFICATE_PASSWORD` are configured, the release workflow signs the release binaries and installer before publication. Without those secrets, the packages are still built and published but Windows may identify the publisher as unknown.
+## Multi-monitor overlay behavior
+
+The in-game overlay is bound to the monitor containing the visible Fortnite process window instead of spanning the entire Windows virtual desktop. Nexus re-checks the target monitor periodically so moving Fortnite to another display updates the overlay without restarting it. The in-game menu starts open and interactive on that same monitor; the configured menu key (Insert by default) toggles click-through mode.
+
 ## Runtime architecture
 
 - `main.cpp` — application startup and shutdown

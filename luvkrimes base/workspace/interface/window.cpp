@@ -18,31 +18,113 @@ namespace overlay {
 namespace {
 constexpr wchar_t kWindowClassName[] = L"NexusOverlay";
 constexpr wchar_t kWindowTitle[] = L"Nexus";
+
+struct WindowSearchContext {
+	DWORD ProcessId = 0;
+	HWND BestWindow = nullptr;
+	long long BestArea = 0;
+};
+
+BOOL CALLBACK FindProcessWindow(
+	HWND hwnd,
+	LPARAM parameter
+) {
+	auto* context =
+		reinterpret_cast<WindowSearchContext*>(parameter);
+
+	if (!context || !IsWindowVisible(hwnd)) {
+		return TRUE;
+	}
+
+	DWORD processId = 0;
+	GetWindowThreadProcessId(hwnd, &processId);
+	if (processId != context->ProcessId) {
+		return TRUE;
+	}
+
+	if (GetWindow(hwnd, GW_OWNER) != nullptr) {
+		return TRUE;
+	}
+
+	RECT rect{};
+	if (!GetWindowRect(hwnd, &rect)) {
+		return TRUE;
+	}
+
+	const long long width =
+		static_cast<long long>(rect.right) - rect.left;
+	const long long height =
+		static_cast<long long>(rect.bottom) - rect.top;
+	const long long area = width * height;
+
+	if (width <= 0 || height <= 0 || area <= context->BestArea) {
+		return TRUE;
+	}
+
+	context->BestArea = area;
+	context->BestWindow = hwnd;
+	return TRUE;
+}
 }
 
 Window::~Window() {
 	Destroy();
 }
 
-RECT Window::VirtualDesktopBounds() noexcept {
-	const int left = GetSystemMetrics(SM_XVIRTUALSCREEN);
-	const int top = GetSystemMetrics(SM_YVIRTUALSCREEN);
-	const int width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
-	const int height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+HWND Window::TargetWindow() const noexcept {
+	if (m_TargetProcessId == 0) {
+		return nullptr;
+	}
+
+	WindowSearchContext context{};
+	context.ProcessId = m_TargetProcessId;
+	EnumWindows(
+		&FindProcessWindow,
+		reinterpret_cast<LPARAM>(&context)
+	);
+
+	return context.BestWindow;
+}
+
+RECT Window::TargetMonitorBounds() const noexcept {
+	HMONITOR monitor = nullptr;
+
+	if (const HWND target = TargetWindow()) {
+		monitor = MonitorFromWindow(
+			target,
+			MONITOR_DEFAULTTONEAREST
+		);
+	}
+
+	if (!monitor) {
+		POINT origin{0, 0};
+		monitor = MonitorFromPoint(
+			origin,
+			MONITOR_DEFAULTTOPRIMARY
+		);
+	}
+
+	MONITORINFO info{};
+	info.cbSize = sizeof(info);
+
+	if (monitor && GetMonitorInfoW(monitor, &info)) {
+		return info.rcMonitor;
+	}
 
 	return RECT{
-		left,
-		top,
-		left + width,
-		top + height
+		0,
+		0,
+		GetSystemMetrics(SM_CXSCREEN),
+		GetSystemMetrics(SM_CYSCREEN)
 	};
 }
 
-bool Window::Create() {
+bool Window::Create(DWORD targetProcessId) {
 	if (m_Hwnd) {
 		return true;
 	}
 
+	m_TargetProcessId = targetProcessId;
 	ImGui_ImplWin32_EnableDpiAwareness();
 
 	m_Instance = GetModuleHandleW(nullptr);
@@ -71,7 +153,7 @@ bool Window::Create() {
 		m_OwnsClass = true;
 	}
 
-	const RECT bounds = VirtualDesktopBounds();
+	const RECT bounds = TargetMonitorBounds();
 	const int width = bounds.right - bounds.left;
 	const int height = bounds.bottom - bounds.top;
 
@@ -109,7 +191,7 @@ bool Window::Create() {
 	UpdateWindow(m_Hwnd);
 
 	logger::Log(
-		"[window] virtual desktop %dx%d at (%d,%d), dpi %.2f",
+		"[window] target monitor %dx%d at (%d,%d), dpi %.2f",
 		width,
 		height,
 		bounds.left,
@@ -133,6 +215,7 @@ void Window::Destroy() {
 	}
 
 	m_Instance = nullptr;
+	m_TargetProcessId = 0;
 }
 
 HWND Window::Handle() const noexcept {
@@ -151,12 +234,12 @@ bool Window::PumpMessages() const {
 	return true;
 }
 
-bool Window::SyncToVirtualDesktop() {
+bool Window::SyncToTargetMonitor() {
 	if (!m_Hwnd) {
 		return false;
 	}
 
-	const RECT expected = VirtualDesktopBounds();
+	const RECT expected = TargetMonitorBounds();
 	RECT current{};
 	if (!GetWindowRect(m_Hwnd, &current)) {
 		return false;
@@ -183,12 +266,12 @@ bool Window::SyncToVirtualDesktop() {
 		height,
 		SWP_NOACTIVATE | SWP_NOZORDER
 	)) {
-		logger::Log("[window] virtual desktop resize failed (%lu)", GetLastError());
+		logger::Log("[window] target monitor resize failed (%lu)", GetLastError());
 		return false;
 	}
 
 	logger::Log(
-		"[window] display layout changed -> %dx%d at (%d,%d)",
+		"[window] target monitor changed -> %dx%d at (%d,%d)",
 		width,
 		height,
 		expected.left,

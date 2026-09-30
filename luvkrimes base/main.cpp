@@ -96,7 +96,7 @@ i32 main(i32, char**) {
 
 	constexpr const wchar_t* processName = L"FortniteClient-Win64-Shipping.exe";
 
-	WaitForProcess(processName, "fortnite");
+	const u32 processId = WaitForProcess(processName, "fortnite");
 
 	logger::Log("attaching driver");
 
@@ -121,7 +121,7 @@ i32 main(i32, char**) {
 	logger::Log("cache threads running");
 
 	logger::Log("starting overlay");
-	const bool ok = overlay::run(players, camera);
+	const bool ok = overlay::run(players, camera, processId);
 
 	players.Stop();
 
