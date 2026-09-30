@@ -26,10 +26,10 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 }
 
 $output = [System.IO.Path]::GetFullPath($OutputDirectory)
-$stage = Join-Path $output ("stage\Luvkrimes-" + $Version)
+$stage = Join-Path $output ("stage\Nexus-" + $Version)
 
-$loaderSource = Join-Path $root "loader\bin\x64\$Configuration\luvkrimes-loader.exe"
-$fortniteSource = Join-Path $root "luvkrimes base\x64\$Configuration\luvkrimes base.exe"
+$loaderSource = Join-Path $root "loader\bin\x64\$Configuration\Nexus.exe"
+$fortniteSource = Join-Path $root "luvkrimes base\x64\$Configuration\Nexus-Fortnite.exe"
 
 foreach ($required in @($loaderSource, $fortniteSource)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
@@ -44,34 +44,34 @@ if (Test-Path -LiteralPath $output) {
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $stage "projects\fortnite") | Out-Null
 
-Copy-Item -LiteralPath $loaderSource -Destination (Join-Path $stage "Luvkrimes.exe")
-Copy-Item -LiteralPath $fortniteSource -Destination (Join-Path $stage "projects\fortnite\Luvkrimes-Fortnite.exe")
+Copy-Item -LiteralPath $loaderSource -Destination (Join-Path $stage "Nexus.exe")
+Copy-Item -LiteralPath $fortniteSource -Destination (Join-Path $stage "projects\fortnite\Nexus-Fortnite.exe")
 
 Set-Content -LiteralPath (Join-Path $stage "VERSION.txt") -Value $Version -Encoding utf8NoBOM
 
 $readme = @"
-Luvkrimes $Version
+Nexus $Version
 
-1. Launch Luvkrimes.exe.
+1. Launch Nexus.exe.
 2. Select the configured product.
 3. Authenticate with the license key supplied for that product.
 4. Use LAUNCH after authentication.
 
 Packaged Fortnite executable:
-projects\fortnite\Luvkrimes-Fortnite.exe
+projects\fortnite\Nexus-Fortnite.exe
 
 Optional development override:
-LUVKRIMES_TARGET_FORTNITE
+NEXUS_TARGET_FORTNITE
 
 Local settings, logs and remembered licenses:
-%LOCALAPPDATA%\luvkrimes
+%LOCALAPPDATA%\Nexus
 
 Visual Studio and the source repository are not required.
 "@
 
 Set-Content -LiteralPath (Join-Path $stage "README.txt") -Value $readme -Encoding utf8NoBOM
 
-$portablePath = Join-Path $output ("Luvkrimes-Portable-" + $Version + ".zip")
+$portablePath = Join-Path $output ("Nexus-Portable-" + $Version + ".zip")
 Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $portablePath -CompressionLevel Optimal
 
 $makensisCommand = Get-Command "makensis.exe" -ErrorAction SilentlyContinue
@@ -95,7 +95,7 @@ if ([string]::IsNullOrWhiteSpace($makensisPath)) {
     throw "makensis.exe was not found. Install NSIS before packaging."
 }
 
-$installerScript = Join-Path $root "installer\luvkrimes.nsi"
+$installerScript = Join-Path $root "installer\nexus.nsi"
 
 & $makensisPath `
     "/DVERSION=$Version" `
@@ -108,7 +108,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "NSIS failed with exit code $LASTEXITCODE."
 }
 
-$installerPath = Join-Path $output ("Luvkrimes-Setup-" + $Version + ".exe")
+$installerPath = Join-Path $output ("Nexus-Setup-" + $Version + ".exe")
 if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
     throw "Installer was not created: $installerPath"
 }

@@ -15,7 +15,7 @@
     <VCProjectVersion>18.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{8F741397-06DB-49B6-8A6E-43AD87694C11}</ProjectGuid>
-    <RootNamespace>LuvkrimesLoader</RootNamespace>
+    <RootNamespace>NexusLoader</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
 
@@ -40,6 +40,7 @@
 
   <PropertyGroup>
     <OutDir>$(ProjectDir)bin\$(Platform)\$(Configuration)\</OutDir>
+    <TargetName>Nexus</TargetName>
     <IntDir>$(ProjectDir)obj\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
 

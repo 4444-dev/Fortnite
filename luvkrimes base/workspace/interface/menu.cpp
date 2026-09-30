@@ -535,7 +535,7 @@ void menu::render( const RuntimeStatus& status ) {
 	ImGui::SetNextWindowPos( ImVec2( 60.0f, 60.0f ), ImGuiCond_FirstUseEver );
 	ImGui::SetNextWindowSize( size );
 	ImGui::PushFont( font, font_size );
-	ImGui::Begin( "##luvkrimes", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar |
+	ImGui::Begin( "##nexus", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar |
 		ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse );
 	{
 		ImDrawList*  dl = ImGui::GetWindowDrawList( );
@@ -551,8 +551,8 @@ void menu::render( const RuntimeStatus& status ) {
 		char date[ 32 ];
 		std::snprintf( date, sizeof( date ), " | %s %d %d", months[ ( st.wMonth - 1 ) % 12 ], st.wDay, st.wYear );
 
-		const ImVec2 ms = text_size( "luvkrimes base" );
-		text( dl, wp + ImVec2( 9, 6 ), accent( ), "luvkrimes base" );
+		const ImVec2 ms = text_size( "Nexus" );
+		text( dl, wp + ImVec2( 9, 6 ), accent( ), "Nexus" );
 		text( dl, wp + ImVec2( 9 + ms.x, 6 ), col::dim, date );
 
 		dl->AddRectFilledMultiColor( wp + ImVec2( 2, 24 ), wp + ImVec2( size.x - 2, 26 ), accent( ), accent( 0.45f ), accent( 0.45f ), accent( ) );

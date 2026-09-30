@@ -81,7 +81,7 @@ bool KeyValueConfig::Save(const std::filesystem::path& path) const {
 			return false;
 		}
 
-		output << "# luvkrimes settings\n";
+		output << "# Nexus settings\n";
 		for (const auto& [key, value] : m_Values) {
 			output << key << '=' << value << '\n';
 		}

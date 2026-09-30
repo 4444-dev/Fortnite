@@ -16,8 +16,8 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(
 
 namespace overlay {
 namespace {
-constexpr wchar_t kWindowClassName[] = L"LuvkrimesOverlay";
-constexpr wchar_t kWindowTitle[] = L"luvkrimes base";
+constexpr wchar_t kWindowClassName[] = L"NexusOverlay";
+constexpr wchar_t kWindowTitle[] = L"Nexus";
 }
 
 Window::~Window() {

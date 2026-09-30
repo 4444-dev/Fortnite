@@ -6,6 +6,7 @@
 #include "../loader/product_registry.hpp"
 
 #include <Windows.h>
+#include <wincrypt.h>
 
 #include <filesystem>
 #include <fstream>
@@ -33,7 +34,7 @@ public:
 		m_Root =
 			std::filesystem::temp_directory_path() /
 			(
-				L"luvkrimes-loader-tests-" +
+				L"nexus-loader-tests-" +
 				std::to_wstring(GetCurrentProcessId())
 			);
 
@@ -79,6 +80,15 @@ public:
 	) const {
 		return
 			m_Root /
+			L"Nexus" /
+			L"licenses" /
+			std::filesystem::path(std::string(slug) + ".dat");
+	}
+	[[nodiscard]] std::filesystem::path LegacyLicensePath(
+		std::string_view slug
+	) const {
+		return
+			m_Root /
 			L"luvkrimes" /
 			L"licenses" /
 			std::filesystem::path(std::string(slug) + ".dat");
@@ -90,6 +100,72 @@ private:
 	bool m_HadOriginal = false;
 	bool m_Ready = false;
 };
+
+bool WriteLegacyLicenseBlob(
+	const std::filesystem::path& path,
+	std::string_view slug,
+	const std::string& value
+) {
+	std::error_code error;
+	std::filesystem::create_directories(
+		path.parent_path(),
+		error
+	);
+	if (error) {
+		return false;
+	}
+
+	DATA_BLOB input{};
+	input.pbData = reinterpret_cast<BYTE*>(
+		const_cast<char*>(value.data())
+	);
+	input.cbData = static_cast<DWORD>(value.size());
+
+	std::string entropyText =
+		"luvkrimes-license-entropy-v1:" +
+		std::string(slug);
+	DATA_BLOB entropy{};
+	entropy.pbData =
+		reinterpret_cast<BYTE*>(entropyText.data());
+	entropy.cbData =
+		static_cast<DWORD>(entropyText.size());
+
+	const std::string descriptionText =
+		"luvkrimes-license-" + std::string(slug);
+	const std::wstring description(
+		descriptionText.begin(),
+		descriptionText.end()
+	);
+
+	DATA_BLOB output{};
+	if (!CryptProtectData(
+		&input,
+		description.c_str(),
+		&entropy,
+		nullptr,
+		nullptr,
+		CRYPTPROTECT_UI_FORBIDDEN,
+		&output
+	)) {
+		return false;
+	}
+
+	std::ofstream file(
+		path,
+		std::ios::binary | std::ios::trunc
+	);
+	if (file) {
+		file.write(
+			reinterpret_cast<const char*>(output.pbData),
+			static_cast<std::streamsize>(output.cbData)
+		);
+		file.flush();
+	}
+
+	const bool success = file.good();
+	LocalFree(output.pbData);
+	return success;
+}
 
 bool RunProductRegistryTests() {
 	bool ok = true;
@@ -119,7 +195,7 @@ bool RunProductRegistryTests() {
 	);
 	ok &= Check(
 		loader::Fortnite.PackagedTargetRelativePath ==
-			L"projects\\fortnite\\Luvkrimes-Fortnite.exe",
+			L"projects\\fortnite\\Nexus-Fortnite.exe",
 		"Fortnite packaged target path"
 	);
 	ok &= Check(
@@ -138,6 +214,21 @@ bool RunProductRegistryTests() {
 		loader::Fortnite.TargetEnvironmentVariable !=
 			loader::ApexLegends.TargetEnvironmentVariable,
 		"product launch targets isolated"
+	);
+	ok &= Check(
+		loader::Fortnite.TargetEnvironmentVariable ==
+			L"NEXUS_TARGET_FORTNITE",
+		"Nexus Fortnite launch override"
+	);
+	ok &= Check(
+		loader::Fortnite.LegacyTargetEnvironmentVariable ==
+			L"LUVKRIMES_TARGET_FORTNITE",
+		"legacy Fortnite launch override retained"
+	);
+	ok &= Check(
+		loader::ApexLegends.TargetEnvironmentVariable ==
+			L"NEXUS_TARGET_APEX",
+		"Nexus Apex launch override"
 	);
 	ok &= Check(
 		loader::IsValidProductSlug("fortnite"),
@@ -182,12 +273,48 @@ bool RunLicenseStoreTests() {
 		return false;
 	}
 
-	constexpr std::string_view slug = "luvkrimes-ci-test";
-	constexpr std::string_view otherSlug = "luvkrimes-ci-other";
+	constexpr std::string_view slug = "nexus-ci-test";
+	constexpr std::string_view otherSlug = "nexus-ci-other";
 	const std::string value = "test-license-value";
 
 	loader::license_store::Clear(slug);
 	loader::license_store::Clear(otherSlug);
+	constexpr std::string_view legacySlug =
+		"nexus-legacy-migration";
+	const std::string legacyValue =
+		"legacy-license-value";
+
+	loader::license_store::Clear(legacySlug);
+
+	ok &= Check(
+		WriteLegacyLicenseBlob(
+			localAppData.LegacyLicensePath(legacySlug),
+			legacySlug,
+			legacyValue
+		),
+		"create legacy remembered-license blob"
+	);
+
+	std::string migratedLegacy;
+	ok &= Check(
+		loader::license_store::Load(
+			legacySlug,
+			migratedLegacy
+		) &&
+			migratedLegacy == legacyValue,
+		"load legacy remembered-license blob"
+	);
+	ok &= Check(
+		std::filesystem::exists(
+			localAppData.LicensePath(legacySlug)
+		) &&
+			!std::filesystem::exists(
+				localAppData.LegacyLicensePath(legacySlug)
+			),
+		"migrate legacy remembered-license storage to Nexus"
+	);
+
+	loader::license_store::Clear(legacySlug);
 
 	ok &= Check(
 		!loader::license_store::Save("../invalid", value),
