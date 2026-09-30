@@ -31,7 +31,7 @@ std::filesystem::path LocalAppDataPath() {
 }
 
 std::filesystem::path LogPath() {
-	return LocalAppDataPath() / L"luvkrimes" / L"logs" / L"latest.log";
+	return LocalAppDataPath() / L"Nexus" / L"logs" / L"latest.log";
 }
 
 } // namespace
