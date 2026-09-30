@@ -104,7 +104,10 @@ void AuthController::Authenticate(std::string license, bool remember) {
 			}
 
 			if (remember) {
-				(void)license_store::Save(m_Product.Slug, license);
+				if (!license_store::Save(m_Product.Slug, license)) {
+					m_Snapshot.Status +=
+						" License accepted, but Windows could not remember it.";
+				}
 			} else {
 				license_store::Clear(m_Product.Slug);
 			}
