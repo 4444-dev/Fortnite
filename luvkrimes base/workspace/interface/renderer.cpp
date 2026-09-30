@@ -197,8 +197,9 @@ bool Renderer::EndFrame() {
 	m_DeviceContext->ClearRenderTargetView(target, clearColor);
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-	const HRESULT result = m_SwapChain->Present(0, 0);
+	const HRESULT result = m_SwapChain->Present(1, 0);
 	if (result == DXGI_STATUS_OCCLUDED) {
+		Sleep(16);
 		return true;
 	}
 	if (FAILED(result)) {
