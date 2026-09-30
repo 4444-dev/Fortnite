@@ -55,6 +55,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>Crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 
@@ -78,6 +79,7 @@
   <ItemGroup>
     <ClCompile Include="config_tests.cpp" />
     <ClCompile Include="..\loader\launch_target.cpp" />
+    <ClCompile Include="..\loader\license_store.cpp" />
     <ClCompile Include="..\luvkrimes base\workspace\util\config\kv_config.cpp" />
   </ItemGroup>
 
