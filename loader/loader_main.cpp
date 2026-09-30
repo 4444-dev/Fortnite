@@ -289,6 +289,13 @@ struct DxState {
 
 DxState g_Dx{};
 
+void ReleaseCom(IUnknown*& object) {
+	if (object) {
+		object->Release();
+		object = nullptr;
+	}
+}
+
 void DestroyRenderTarget() {
 	if (g_Dx.Target) {
 		g_Dx.Target->Release();
@@ -355,21 +362,15 @@ bool CreateDevice(HWND hwnd) {
 
 void CleanupDevice() {
 	DestroyRenderTarget();
-
-	if (g_Dx.SwapChain) {
-		g_Dx.SwapChain->Release();
-		g_Dx.SwapChain = nullptr;
-	}
-
-	if (g_Dx.Context) {
-		g_Dx.Context->Release();
-		g_Dx.Context = nullptr;
-	}
-
-	if (g_Dx.Device) {
-		g_Dx.Device->Release();
-		g_Dx.Device = nullptr;
-	}
+	IUnknown* swapChain = g_Dx.SwapChain;
+	IUnknown* context = g_Dx.Context;
+	IUnknown* device = g_Dx.Device;
+	ReleaseCom(swapChain);
+	ReleaseCom(context);
+	ReleaseCom(device);
+	g_Dx.SwapChain = nullptr;
+	g_Dx.Context = nullptr;
+	g_Dx.Device = nullptr;
 }
 
 void CenterWindow(HWND hwnd) {
@@ -429,7 +430,7 @@ LRESULT CALLBACK WndProc(
 		) {
 			DestroyRenderTarget();
 
-			g_Dx.SwapChain->ResizeBuffers(
+			const HRESULT resizeResult = g_Dx.SwapChain->ResizeBuffers(
 				0,
 				LOWORD(lparam),
 				HIWORD(lparam),
@@ -437,7 +438,9 @@ LRESULT CALLBACK WndProc(
 				0
 			);
 
-			(void)CreateRenderTarget();
+			if (SUCCEEDED(resizeResult)) {
+				(void)CreateRenderTarget();
+			}
 		}
 		return 0;
 
@@ -1065,7 +1068,10 @@ int WINAPI wWinMain(
 			ImGui::GetDrawData()
 		);
 
-		g_Dx.SwapChain->Present(1, 0);
+		const HRESULT presentResult = g_Dx.SwapChain->Present(1, 0);
+		if (FAILED(presentResult) && presentResult != DXGI_STATUS_OCCLUDED) {
+			running = false;
+		}
 
 		if (requestClose) {
 			running = false;
