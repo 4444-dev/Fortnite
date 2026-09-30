@@ -305,8 +305,10 @@ bool ProductTile(
 			? std::string("Nexus-") +
 				(product.Id == ProductId::Fortnite
 					? "Fortnite.exe"
-					: "Apex.exe")
-			: "Configuration requise";
+					: "Apex-Radar.exe")
+			: !product.PackagedTargetRelativePath.empty()
+				? "Radar inclus - KeyAuth requis"
+				: "Configuration requise";
 
 	draw->AddText(
 		ImVec2(start.x + 16.0f, end.y - 29.0f),
