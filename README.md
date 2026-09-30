@@ -92,7 +92,7 @@ Current products:
 
 Fortnite and Apex must use different KeyAuth applications if their key pools must be isolated. A Fortnite key is therefore sent only to the Fortnite KeyAuth application; an Apex key will be sent only to the Apex KeyAuth application once Apex is configured.
 
-The loader supports license-key authentication, 60-second session revalidation, and optional remembered-license storage using Windows DPAPI. Remembered license material is split by product under `%LOCALAPPDATA%\luvkrimes\licenses\<product>.dat`, encrypted for the current Windows account, and is never loaded across products.
+The loader supports license-key authentication, 60-second session revalidation, and optional remembered-license storage using Windows DPAPI. Remembered license material is split by product under `%LOCALAPPDATA%\luvkrimes\licenses\<product>.dat`, encrypted for the current Windows account and cryptographically bound to the product slug through DPAPI optional entropy. Legacy remembered-license files are accepted once and transparently migrated to the bound format.
 
 Post-authentication launch targets are product-specific:
 - `LUVKRIMES_TARGET_FORTNITE`
