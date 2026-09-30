@@ -14,7 +14,7 @@
     <VCProjectVersion>18.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{929f7d2c-0577-436b-871f-ec6d73958b7b}</ProjectGuid>
-    <RootNamespace>LuvkrimesBase</RootNamespace>
+    <RootNamespace>NexusBase</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -43,6 +43,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <IncludePath>$(ProjectDir);$(IncludePath)</IncludePath>
+    <TargetName>Nexus-Fortnite</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
