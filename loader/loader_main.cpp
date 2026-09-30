@@ -565,7 +565,11 @@ void DrawWindowChrome(bool& requestClose) {
 	ImDrawList* draw = ImGui::GetWindowDrawList();
 
 	const ImVec2 min = ImGui::GetWindowPos();
-	const ImVec2 max = min + ImGui::GetWindowSize();
+	const ImVec2 windowSize = ImGui::GetWindowSize();
+	const ImVec2 max(
+		min.x + windowSize.x,
+		min.y + windowSize.y
+	);
 
 	draw->AddRectFilled(
 		min,
@@ -606,7 +610,10 @@ bool ProductCard(
 
 	ImDrawList* draw = ImGui::GetWindowDrawList();
 
-	const ImVec2 bottomRight = cursor + size;
+	const ImVec2 bottomRight(
+		cursor.x + size.x,
+		cursor.y + size.y
+	);
 
 	draw->AddRect(
 		cursor,
