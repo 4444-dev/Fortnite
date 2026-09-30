@@ -1,4 +1,5 @@
 #include "license_store.hpp"
+#include "product_registry.hpp"
 
 #include <Windows.h>
 #include <wincrypt.h>
@@ -13,26 +14,6 @@
 namespace loader::license_store {
 namespace {
 
-
-bool ValidSlug(std::string_view slug) {
-	if (slug.empty() || slug.size() > 64) {
-		return false;
-	}
-
-	for (const char ch : slug) {
-		const bool valid =
-			(ch >= 'a' && ch <= 'z') ||
-			(ch >= '0' && ch <= '9') ||
-			ch == '-' ||
-			ch == '_';
-
-		if (!valid) {
-			return false;
-		}
-	}
-
-	return true;
-}
 
 std::filesystem::path RootPath() {
 	wchar_t buffer[32768]{};
@@ -68,7 +49,7 @@ bool Save(
 	std::string_view productSlug,
 	const std::string& license
 ) {
-	if (!ValidSlug(productSlug) || license.empty() || license.size() > kMaxLicenseLength) {
+	if (!IsValidProductSlug(productSlug) || license.empty() || license.size() > kMaxLicenseLength) {
 		return false;
 	}
 
@@ -141,7 +122,7 @@ bool Load(
 ) {
 	license.clear();
 
-	if (!ValidSlug(productSlug)) {
+	if (!IsValidProductSlug(productSlug)) {
 		return false;
 	}
 
@@ -214,7 +195,7 @@ bool Load(
 }
 
 void Clear(std::string_view productSlug) {
-	if (!ValidSlug(productSlug)) {
+	if (!IsValidProductSlug(productSlug)) {
 		return;
 	}
 
