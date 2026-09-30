@@ -12,12 +12,24 @@ int WINAPI wWinMain(
 	loader::Window window;
 
 	if (!window.Create()) {
+		MessageBoxW(
+			nullptr,
+			L"Unable to create the loader window.",
+			L"luvkrimes loader",
+			MB_OK | MB_ICONERROR
+		);
 		return 1;
 	}
 
 	window.AttachRenderer(&renderer);
 
 	if (!renderer.Initialize(window.Handle())) {
+		MessageBoxW(
+			window.Handle(),
+			L"Unable to initialize the Direct3D 11 renderer.",
+			L"luvkrimes loader",
+			MB_OK | MB_ICONERROR
+		);
 		return 1;
 	}
 
@@ -25,6 +37,7 @@ int WINAPI wWinMain(
 	window.Show();
 
 	bool running = true;
+	bool rendererFailed = false;
 
 	{
 		loader::UiController ui;
@@ -33,6 +46,7 @@ int WINAPI wWinMain(
 			ui.Tick();
 
 			if (!renderer.IsReady()) {
+				rendererFailed = true;
 				break;
 			}
 
@@ -41,10 +55,22 @@ int WINAPI wWinMain(
 			bool requestClose = false;
 			ui.Draw(requestClose);
 
-			if (!renderer.EndFrame() || requestClose) {
+			if (!renderer.EndFrame()) {
+				rendererFailed = true;
+				running = false;
+			} else if (requestClose) {
 				running = false;
 			}
 		}
+	}
+
+	if (rendererFailed) {
+		MessageBoxW(
+			window.Handle(),
+			L"The renderer stopped unexpectedly. Restart the loader and check your graphics driver if the problem persists.",
+			L"luvkrimes loader",
+			MB_OK | MB_ICONERROR
+		);
 	}
 
 	window.AttachRenderer(nullptr);
