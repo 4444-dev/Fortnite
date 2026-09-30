@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -48,8 +49,11 @@ public:
 	[[nodiscard]] AuthSnapshot Snapshot() const;
 
 private:
-	template <typename Fn>
-	void Run(AuthState state, std::string status, Fn&& fn);
+	void Run(
+		AuthState state,
+		std::string status,
+		std::function<void()> task
+	);
 
 	void JoinWorker();
 
