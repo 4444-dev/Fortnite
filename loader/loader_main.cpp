@@ -14,15 +14,9 @@
 
 #include <algorithm>
 #include <array>
-#include <atomic>
-#include <chrono>
 #include <cstring>
-#include <filesystem>
 #include <memory>
-#include <mutex>
 #include <string>
-#include <thread>
-#include <vector>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -46,6 +40,9 @@ enum class Screen {
 	ProductSelect,
 	Authentication
 };
+
+using LicenseBuffer =
+	std::array<char, loader::license_store::kMaxLicenseLength + 1>;
 
 struct DxState {
 	ID3D11Device* Device = nullptr;
@@ -397,7 +394,7 @@ void DrawProductSelection(
 
 void LoadRememberedLicense(
 	const loader::ProductDefinition& product,
-	std::array<char, 192>& license
+	LicenseBuffer& license
 ) {
 	license.fill('\0');
 
@@ -427,7 +424,8 @@ void DrawAuthentication(
 	std::array<char, 192>& license,
 	bool& remember,
 	bool& goBack,
-	bool& requestClose
+	bool& requestClose,
+	std::string& launchStatus
 ) {
 	const loader::AuthSnapshot snapshot = auth.Snapshot();
 
@@ -527,8 +525,6 @@ void DrawAuthentication(
 
 		ImGui::Spacing();
 
-		static std::string launchStatus;
-
 		if (ImGui::Button(
 			"LAUNCH",
 			ImVec2(-1.0f, 38.0f)
@@ -553,8 +549,8 @@ void DrawAuthentication(
 	const ImVec4 statusColor =
 		snapshot.Authenticated
 			? ImVec4(0.45f, 0.85f, 0.55f, 1.0f)
-			: snapshot.State == AuthState::Error ||
-			  snapshot.State == AuthState::SessionInvalid
+			: snapshot.State == loader::AuthState::Error ||
+			  snapshot.State == loader::AuthState::SessionInvalid
 				? ImVec4(0.95f, 0.38f, 0.38f, 1.0f)
 				: ImVec4(0.70f, 0.70f, 0.74f, 1.0f);
 
@@ -643,7 +639,8 @@ int WINAPI wWinMain(
 	const loader::ProductDefinition* selectedProduct = nullptr;
 
 	std::unique_ptr<loader::AuthController> auth;
-	std::array<char, 192> license{};
+	LicenseBuffer license{};
+	std::string launchStatus;
 	bool remember = true;
 
 	bool running = true;
@@ -698,6 +695,7 @@ int WINAPI wWinMain(
 			if (requestedProduct) {
 				selectedProduct = requestedProduct;
 				remember = true;
+				launchStatus.clear();
 
 				LoadRememberedLicense(
 					*selectedProduct,
@@ -724,13 +722,15 @@ int WINAPI wWinMain(
 				license,
 				remember,
 				goBack,
-				requestClose
+				requestClose,
+				launchStatus
 			);
 
 			if (goBack) {
 				auth.reset();
 				selectedProduct = nullptr;
 				license.fill('\0');
+				launchStatus.clear();
 				screen = Screen::ProductSelect;
 			}
 		}
