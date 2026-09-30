@@ -857,7 +857,7 @@ void UiController::DrawSidebar() {
 			origin.y + size.y - 34.0f
 		),
 		IM_COL32(84, 90, 114, 255),
-		"BUILD 1.0.5"
+		"BUILD 1.0.6"
 	);
 }
 
