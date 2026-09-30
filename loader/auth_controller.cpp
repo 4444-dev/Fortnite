@@ -10,6 +10,14 @@
 namespace loader {
 namespace {
 
+constexpr std::chrono::seconds kSessionCheckInterval{60};
+
+void ClearIdentity(AuthSnapshot& snapshot) {
+	snapshot.Username.clear();
+	snapshot.Subscription.clear();
+	snapshot.Expiry.clear();
+}
+
 class ScopedStringWipe final {
 public:
 	explicit ScopedStringWipe(std::string& value) noexcept
@@ -70,6 +78,7 @@ void AuthController::Initialize() {
 					? "Authentication initialization failed."
 					: m_App.response.message;
 				m_Snapshot.Authenticated = false;
+				ClearIdentity(m_Snapshot);
 				return;
 			}
 
@@ -109,6 +118,7 @@ void AuthController::Authenticate(std::string license, bool remember) {
 					? "License validation failed."
 					: m_App.response.message;
 				m_Snapshot.Authenticated = false;
+				ClearIdentity(m_Snapshot);
 				return;
 			}
 
@@ -140,7 +150,7 @@ void AuthController::Authenticate(std::string license, bool remember) {
 
 			m_NextSessionCheck =
 				std::chrono::steady_clock::now() +
-				std::chrono::seconds(60);
+				kSessionCheckInterval;
 		}
 	);
 }
@@ -172,6 +182,7 @@ void AuthController::Tick() {
 					? "Session validation failed."
 					: m_App.response.message;
 				m_Snapshot.Authenticated = false;
+				ClearIdentity(m_Snapshot);
 				return;
 			}
 
@@ -182,7 +193,7 @@ void AuthController::Tick() {
 			m_Snapshot.Authenticated = true;
 			m_NextSessionCheck =
 				std::chrono::steady_clock::now() +
-				std::chrono::seconds(60);
+				kSessionCheckInterval;
 		}
 	);
 }
@@ -243,6 +254,7 @@ void AuthController::Run(
 			std::string(exception.what());
 		m_Snapshot.Busy = false;
 		m_Snapshot.Authenticated = false;
+		ClearIdentity(m_Snapshot);
 		m_Busy.store(false);
 	}
 }
