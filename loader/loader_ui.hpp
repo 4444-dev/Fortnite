@@ -15,7 +15,7 @@ void ApplyLoaderStyle();
 class UiController final {
 public:
 	UiController() = default;
-	~UiController() = default;
+	~UiController();
 
 	UiController(const UiController&) = delete;
 	UiController& operator=(const UiController&) = delete;
