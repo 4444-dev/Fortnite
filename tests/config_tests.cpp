@@ -268,6 +268,8 @@ int main() {
 
 	int valid = 0;
 	int invalid = 123;
+	int duplicate = 0;
+	float invalidFloat = 9.0f;
 	bool flag = true;
 	bool invalidBool = false;
 	float invalidFloat = 0.0f;
