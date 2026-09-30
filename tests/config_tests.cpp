@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 
 namespace tests {
 
@@ -18,6 +19,10 @@ bool RunConfigTests() {
 	output.SetBool("enabled", true);
 	output.SetInt("count", 42);
 	output.SetFloat("scale", 1.25f);
+	output.SetFloat(
+		"nonfinite_saved",
+		std::numeric_limits<float>::infinity()
+	);
 	output.SetString("name", "test value");
 
 	if (!Check(output.Save(path), "save config")) {
@@ -51,6 +56,15 @@ bool RunConfigTests() {
 		input.TryGetFloat("scale", scale) &&
 			NearlyEqual(scale, 1.25, 0.0001),
 		"float roundtrip"
+	)) {
+		return false;
+	}
+
+	float normalized = -1.0f;
+	if (!Check(
+		input.TryGetFloat("nonfinite_saved", normalized) &&
+			NearlyEqual(normalized, 0.0),
+		"normalize non-finite float on save"
 	)) {
 		return false;
 	}
