@@ -110,3 +110,69 @@ jobs:
               throw "Regression test pass $attempt failed with exit code $LASTEXITCODE."
             }
           }
+
+      - name: Install NSIS
+        if: matrix.configuration == 'Release'
+        shell: pwsh
+        run: |
+          choco install nsis --version=3.12.0 --yes --no-progress
+
+      - name: Build distribution package
+        if: matrix.configuration == 'Release'
+        shell: pwsh
+        run: |
+          & ".\scripts\package-release.ps1" -Version "0.0.0-ci"
+
+          $expected = @(
+            ".\dist\Luvkrimes-Setup-0.0.0-ci.exe",
+            ".\dist\Luvkrimes-Portable-0.0.0-ci.zip",
+            ".\dist\SHA256SUMS.txt"
+          )
+
+          foreach ($path in $expected) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Expected distribution artifact is missing: $path"
+            }
+          }
+
+      - name: Test installer round-trip
+        if: matrix.configuration == 'Release'
+        shell: pwsh
+        run: |
+          $installer = (Resolve-Path ".\dist\Luvkrimes-Setup-0.0.0-ci.exe").Path
+          $installDir = Join-Path $env:RUNNER_TEMP "luvkrimes-install"
+
+          if (Test-Path -LiteralPath $installDir) {
+            Remove-Item -LiteralPath $installDir -Recurse -Force
+          }
+
+          $install = Start-Process -FilePath $installer -ArgumentList @("/S", "/D=$installDir") -Wait -PassThru
+
+          if ($install.ExitCode -ne 0) {
+            throw "Silent installer failed with exit code $($install.ExitCode)."
+          }
+
+          $installed = @(
+            (Join-Path $installDir "Luvkrimes.exe"),
+            (Join-Path $installDir "projects\fortnite\Luvkrimes-Fortnite.exe"),
+            (Join-Path $installDir "Uninstall.exe")
+          )
+
+          foreach ($path in $installed) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Installed file is missing: $path"
+            }
+          }
+
+          $uninstaller = Join-Path $installDir "Uninstall.exe"
+          $uninstall = Start-Process -FilePath $uninstaller -ArgumentList "/S" -Wait -PassThru
+
+          if ($uninstall.ExitCode -ne 0) {
+            throw "Silent uninstaller failed with exit code $($uninstall.ExitCode)."
+          }
+
+          foreach ($path in $installed[0..1]) {
+            if (Test-Path -LiteralPath $path) {
+              throw "Uninstaller left product binary behind: $path"
+            }
+          }
