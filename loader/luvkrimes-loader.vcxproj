@@ -46,6 +46,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -67,6 +68,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -97,36 +99,47 @@
     <ClCompile Include="license_store.cpp" />
     <ClCompile Include="..\luvkrimes base\thirdparty\imgui\imgui.cpp">
       <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <ClCompile Include="..\luvkrimes base\thirdparty\imgui\imgui_draw.cpp">
       <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <ClCompile Include="..\luvkrimes base\thirdparty\imgui\imgui_tables.cpp">
       <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <ClCompile Include="..\luvkrimes base\thirdparty\imgui\imgui_widgets.cpp">
       <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <ClCompile Include="..\luvkrimes base\thirdparty\imgui\backends\imgui_impl_dx11.cpp">
       <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <ClCompile Include="..\luvkrimes base\thirdparty\imgui\backends\imgui_impl_win32.cpp">
       <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <ClCompile Include="..\thirdparty\keyauth\auth.cpp">
       <WarningLevel>Level1</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <ClCompile Include="..\thirdparty\keyauth\utils.cpp">
       <WarningLevel>Level1</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <ClCompile Include="..\thirdparty\keyauth\QRCode\pingout.cpp">
       <WarningLevel>Level1</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <ClCompile Include="..\thirdparty\keyauth\QRCode\qr.png.cpp">
       <WarningLevel>Level1</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <ClCompile Include="..\thirdparty\keyauth\QRCode\qrcode.cpp">
       <WarningLevel>Level1</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
   </ItemGroup>
 
