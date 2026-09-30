@@ -67,7 +67,25 @@ jobs:
             /p:PreferredToolArchitecture="x64" `
             /verbosity:minimal
 
+      - name: Verify expected outputs
+        shell: pwsh
+        run: |
+          $expected = @(
+            ".\\luvkrimes base\\x64\\${{ matrix.configuration }}\\luvkrimes base.exe",
+            ".\\loader\\bin\\x64\\${{ matrix.configuration }}\\luvkrimes-loader.exe",
+            ".\\tests\\bin\\x64\\${{ matrix.configuration }}\\luvkrimes-tests.exe"
+          )
+
+          foreach ($path in $expected) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Expected build output missing: $path"
+            }
+          }
+
       - name: Run tests
         shell: pwsh
         run: |
-          & ".\tests\bin\x64\${{ matrix.configuration }}\luvkrimes-tests.exe"
+          & ".\\tests\\bin\\x64\\${{ matrix.configuration }}\\luvkrimes-tests.exe"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
