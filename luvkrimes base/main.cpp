@@ -92,7 +92,7 @@ void PressKeyToExit() {
 i32 main(i32, char**) {
 	crash_handler::Install();
 	logger::Init();
-	SetConsoleTitleW(L"luvkrimes base");
+	SetConsoleTitleW(L"Nexus");
 
 	constexpr const wchar_t* processName = L"FortniteClient-Win64-Shipping.exe";
 
