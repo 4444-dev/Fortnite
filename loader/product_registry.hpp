@@ -24,6 +24,7 @@ struct ProductDefinition {
 	std::string_view KeyAuthPath;
 
 	std::wstring_view TargetEnvironmentVariable;
+	std::wstring_view LegacyTargetEnvironmentVariable;
 	std::wstring_view PackagedTargetRelativePath;
 	bool Configured;
 };
@@ -61,8 +62,9 @@ inline constexpr std::array<ProductDefinition, 2> Products{{
 		"1.0",
 		"https://keyauth.win/api/1.3/",
 		"",
+		L"NEXUS_TARGET_FORTNITE",
 		L"LUVKRIMES_TARGET_FORTNITE",
-		L"projects\\fortnite\\Luvkrimes-Fortnite.exe",
+		L"projects\\fortnite\\Nexus-Fortnite.exe",
 		true
 	},
 	{
@@ -75,6 +77,7 @@ inline constexpr std::array<ProductDefinition, 2> Products{{
 		"1.0",
 		"https://keyauth.win/api/1.3/",
 		"",
+		L"NEXUS_TARGET_APEX",
 		L"LUVKRIMES_TARGET_APEX",
 		L"",
 		false
@@ -116,6 +119,8 @@ inline constexpr const ProductDefinition& ApexLegends = Products[1];
 				product.Slug == Products[j].Slug ||
 				product.TargetEnvironmentVariable ==
 					Products[j].TargetEnvironmentVariable ||
+				product.LegacyTargetEnvironmentVariable ==
+					Products[j].LegacyTargetEnvironmentVariable ||
 				(
 					!product.PackagedTargetRelativePath.empty() &&
 					product.PackagedTargetRelativePath ==
