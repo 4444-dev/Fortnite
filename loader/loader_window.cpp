@@ -137,14 +137,32 @@ void Window::Center() const {
 		return;
 	}
 
-	const int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-	const int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+	POINT cursor{};
+	if (!GetCursorPos(&cursor)) {
+		cursor = POINT{0, 0};
+	}
+
+	const HMONITOR monitor = MonitorFromPoint(
+		cursor,
+		MONITOR_DEFAULTTOPRIMARY
+	);
+
+	MONITORINFO info{};
+	info.cbSize = sizeof(info);
+
+	if (!GetMonitorInfoW(monitor, &info)) {
+		return;
+	}
+
+	const RECT& area = info.rcWork;
+	const int areaWidth = area.right - area.left;
+	const int areaHeight = area.bottom - area.top;
 
 	SetWindowPos(
 		m_Hwnd,
 		HWND_TOP,
-		(screenWidth - kWindowWidth) / 2,
-		(screenHeight - kWindowHeight) / 2,
+		area.left + (areaWidth - kWindowWidth) / 2,
+		area.top + (areaHeight - kWindowHeight) / 2,
 		kWindowWidth,
 		kWindowHeight,
 		SWP_NOACTIVATE
