@@ -118,6 +118,15 @@ bool RunProductRegistryTests() {
 		"configured KeyAuth endpoint uses HTTPS"
 	);
 	ok &= Check(
+		loader::Fortnite.PackagedTargetRelativePath ==
+			L"projects\\fortnite\\Luvkrimes-Fortnite.exe",
+		"Fortnite packaged target path"
+	);
+	ok &= Check(
+		loader::ApexLegends.PackagedTargetRelativePath.empty(),
+		"Apex has no packaged target until configured"
+	);
+	ok &= Check(
 		!loader::ApexLegends.Configured,
 		"Apex remains disabled until configured"
 	);
