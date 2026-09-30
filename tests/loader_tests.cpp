@@ -8,6 +8,7 @@
 #include <Windows.h>
 
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <string_view>
 
@@ -226,6 +227,51 @@ bool RunLicenseStoreTests() {
 		!loader::license_store::Load(otherSlug, crossProduct) &&
 			crossProduct.empty(),
 		"reject remembered license copied across product slugs"
+	);
+
+	{
+		std::fstream encrypted(
+			localAppData.LicensePath(slug),
+			std::ios::binary | std::ios::in | std::ios::out
+		);
+
+		char first = 0;
+		if (encrypted.read(&first, 1)) {
+			first = static_cast<char>(
+				static_cast<unsigned char>(first) ^ 0x5A
+			);
+			encrypted.seekp(0, std::ios::beg);
+			encrypted.write(&first, 1);
+			encrypted.flush();
+		}
+
+		ok &= Check(
+			encrypted.good(),
+			"corrupt encrypted license blob for integrity test"
+		);
+	}
+
+	std::string corrupted;
+	ok &= Check(
+		!loader::license_store::Load(slug, corrupted) &&
+			corrupted.empty(),
+		"reject corrupted remembered license blob"
+	);
+
+	const std::string maximumLicense(
+		loader::license_store::kMaxLicenseLength,
+		'm'
+	);
+	ok &= Check(
+		loader::license_store::Save(slug, maximumLicense),
+		"accept maximum-length remembered license"
+	);
+
+	loaded.clear();
+	ok &= Check(
+		loader::license_store::Load(slug, loaded) &&
+			loaded == maximumLicense,
+		"maximum-length remembered license roundtrip"
 	);
 
 	loader::license_store::Clear(slug);
