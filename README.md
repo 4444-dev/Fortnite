@@ -72,17 +72,6 @@ Unhandled process crashes write a `MiniDumpNormal` file into a `crashdumps` fold
 
 A separate `loader/luvkrimes-loader.vcxproj` project provides a dark ImGui authentication window using KeyAuth API 1.3.
 
-The loader is split into small runtime components instead of one monolithic entry point:
-
-- `loader_main.cpp` — startup/shutdown orchestration only
-- `loader_window.*` — Win32 window lifetime and resize routing
-- `loader_renderer.*` — D3D11 + ImGui lifetime, frame presentation and swap-chain resize
-- `loader_ui.*` — product selection and authentication UI state
-- `auth_controller.*` — asynchronous KeyAuth initialization, authentication and session checks
-- `launch_target.*` — product-specific post-authentication process launch
-- `license_store.*` — product-isolated DPAPI persistence
-- `product_registry.hpp` — single source of truth for product definitions and validation
-
 The loader is split into focused components rather than a single entry-point file:
 - `loader_main.cpp` — runtime orchestration only.
 - `loader_window.*` — Win32 window lifetime, message pump, dragging and resize forwarding.
