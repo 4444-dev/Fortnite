@@ -116,6 +116,8 @@ void SettingToggle(
 	bool* value,
 	float* color = nullptr
 ) {
+	ImGui::PushID(label);
+
 	ImGui::AlignTextToFramePadding();
 	ImGui::TextUnformatted(label);
 
@@ -145,8 +147,10 @@ void SettingToggle(
 		);
 	}
 
-	Switch(label, value);
+	Switch("toggle", value);
 	ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+	ImGui::PopID();
 }
 
 void ComboRow(
@@ -326,8 +330,16 @@ bool KeybindRow(
 	const bool waiting =
 		waitingId == id;
 
+	char buttonLabel[80]{};
+	std::snprintf(
+		buttonLabel,
+		sizeof(buttonLabel),
+		"%s###keybind_button",
+		waiting ? "PRESS A KEY..." : keyText
+	);
+
 	if (ImGui::Button(
-		waiting ? "PRESS A KEY..." : keyText,
+		buttonLabel,
 		ImVec2(buttonWidth, 0.0f)
 	)) {
 		waitingId = id;
