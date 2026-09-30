@@ -86,6 +86,12 @@ Section "Nexus" SEC_MAIN
     SetOutPath "$INSTDIR\projects\fortnite"
     File "${SOURCEDIR}\projects\fortnite\Nexus-Fortnite.exe"
 
+    SetOutPath "$INSTDIR\projects\apex"
+    File "${SOURCEDIR}\projects\apex\Nexus-Apex-Radar.exe"
+
+    SetOutPath "$INSTDIR\projects\apex\web"
+    File /r "${SOURCEDIR}\projects\apex\web\*"
+
     WriteUninstaller "$INSTDIR\Uninstall.exe"
 
     WriteRegStr HKCU "${PRODUCT_REGKEY}" "InstallDir" "$INSTDIR"
@@ -115,6 +121,10 @@ Section "Uninstall"
 
     Delete "$INSTDIR\projects\fortnite\Nexus-Fortnite.exe"
     RMDir "$INSTDIR\projects\fortnite"
+
+    Delete "$INSTDIR\projects\apex\Nexus-Apex-Radar.exe"
+    RMDir /r "$INSTDIR\projects\apex"
+
     RMDir "$INSTDIR\projects"
 
     Delete "$INSTDIR\Nexus.exe"

@@ -24,6 +24,18 @@ on pull requests targeting `main`, and on pushes to `main`.
 
 The same matrix builds and executes the standalone regression tests in `tests/` twice per configuration to catch state leakage between runs. CI also verifies that the application, loader and test executables were actually produced before running the test binary. First-party C++ warnings and all linker warnings are treated as errors; the current Debug and Release builds complete with zero compiler/linker warnings.
 
+## Packaged Apex radar
+
+Nexus packages the Apex radar from the separate public repository `4444-dev/Apex`, pinned to commit `c7df9610d51efa2c236b07ccd04b74e660f08e30` for reproducible client releases.
+
+The installed/portable payload contains:
+
+- `projects\apex\Nexus-Apex-Radar.exe`
+- `projects\apex\web\radar.html`
+- `projects\apex\web\maps\...`
+
+The radar runtime is not modified by Nexus; the loader only packages and launches the committed binary/assets. Apex remains unavailable for authenticated launch until its own separate KeyAuth application name and Owner ID are configured in `loader/product_registry.hpp`.
+
 ## Distribution
 
 Client distribution is produced from tested `Release | x64` binaries. The packaging pipeline creates:

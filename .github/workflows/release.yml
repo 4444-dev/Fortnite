@@ -31,6 +31,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Checkout pinned Apex radar
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: 4444-dev/Apex
+          ref: c7df9610d51efa2c236b07ccd04b74e660f08e30
+          path: external/apex
+          persist-credentials: false
+
       - name: Resolve release version
         id: version
         shell: pwsh
@@ -128,7 +136,8 @@ jobs:
         run: |
           $targets = @(
             ".\loader\bin\x64\Release\Nexus.exe",
-            ".\luvkrimes base\x64\Release\Nexus-Fortnite.exe"
+            ".\luvkrimes base\x64\Release\Nexus-Fortnite.exe",
+            ".\external\apex\bin\ApexRadar.exe"
           )
 
           foreach ($target in $targets) {
@@ -186,6 +195,8 @@ jobs:
           $required = @(
             (Join-Path $installDir "Nexus.exe"),
             (Join-Path $installDir "projects\fortnite\Nexus-Fortnite.exe"),
+            (Join-Path $installDir "projects\apex\Nexus-Apex-Radar.exe"),
+            (Join-Path $installDir "projects\apex\web\radar.html"),
             (Join-Path $installDir "Uninstall.exe")
           )
 

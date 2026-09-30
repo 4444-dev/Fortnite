@@ -30,8 +30,11 @@ $stage = Join-Path $output ("stage\Nexus-" + $Version)
 
 $loaderSource = Join-Path $root "loader\bin\x64\$Configuration\Nexus.exe"
 $fortniteSource = Join-Path $root "luvkrimes base\x64\$Configuration\Nexus-Fortnite.exe"
+$apexRoot = Join-Path $root "external\apex"
+$apexSource = Join-Path $apexRoot "bin\ApexRadar.exe"
+$apexWebSource = Join-Path $apexRoot "web"
 
-foreach ($required in @($loaderSource, $fortniteSource)) {
+foreach ($required in @($loaderSource, $fortniteSource, $apexSource)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
         throw "Required release binary is missing: $required"
     }
@@ -43,9 +46,17 @@ if (Test-Path -LiteralPath $output) {
 
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $stage "projects\fortnite") | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $stage "projects\apex") | Out-Null
 
 Copy-Item -LiteralPath $loaderSource -Destination (Join-Path $stage "Nexus.exe")
 Copy-Item -LiteralPath $fortniteSource -Destination (Join-Path $stage "projects\fortnite\Nexus-Fortnite.exe")
+Copy-Item -LiteralPath $apexSource -Destination (Join-Path $stage "projects\apex\Nexus-Apex-Radar.exe")
+
+if (-not (Test-Path -LiteralPath $apexWebSource -PathType Container)) {
+    throw "Required Apex web assets are missing: $apexWebSource"
+}
+
+Copy-Item -LiteralPath $apexWebSource -Destination (Join-Path $stage "projects\apex\web") -Recurse
 
 Set-Content -LiteralPath (Join-Path $stage "VERSION.txt") -Value $Version -Encoding utf8NoBOM
 
@@ -60,8 +71,15 @@ Nexus $Version
 Packaged Fortnite executable:
 projects\fortnite\Nexus-Fortnite.exe
 
-Optional development override:
+Packaged Apex radar:
+projects\apex\Nexus-Apex-Radar.exe
+
+Apex radar web assets:
+projects\apex\web\
+
+Optional development overrides:
 NEXUS_TARGET_FORTNITE
+NEXUS_TARGET_APEX
 
 Local settings, logs and remembered licenses:
 %LOCALAPPDATA%\Nexus

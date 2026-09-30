@@ -199,8 +199,9 @@ bool RunProductRegistryTests() {
 		"Fortnite packaged target path"
 	);
 	ok &= Check(
-		loader::ApexLegends.PackagedTargetRelativePath.empty(),
-		"Apex has no packaged target until configured"
+		loader::ApexLegends.PackagedTargetRelativePath ==
+			L"projects\\apex\\Nexus-Apex-Radar.exe",
+		"Apex packaged radar target path"
 	);
 	ok &= Check(
 		!loader::ApexLegends.Configured,
