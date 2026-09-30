@@ -268,6 +268,48 @@ if (-not $text.Contains($oldFilenameConversion)) {
 }
 $text = $text.Replace($oldFilenameConversion, $newFilenameConversion)
 
+$oldQueryConversion = @'
+        std::wstring ws(pRequest->CookedUrl.pQueryString);
+        std::string myVarS = std::string(ws.begin(), ws.end());
+'@
+
+$newQueryConversion = @'
+        std::wstring ws(pRequest->CookedUrl.pQueryString);
+        std::string myVarS;
+        if (!ws.empty()) {
+            const int utf8Size = WideCharToMultiByte(
+                CP_UTF8,
+                0,
+                ws.data(),
+                static_cast<int>(ws.size()),
+                nullptr,
+                0,
+                nullptr,
+                nullptr
+            );
+            if (utf8Size > 0) {
+                myVarS.resize(static_cast<std::size_t>(utf8Size));
+                if (WideCharToMultiByte(
+                    CP_UTF8,
+                    0,
+                    ws.data(),
+                    static_cast<int>(ws.size()),
+                    myVarS.data(),
+                    utf8Size,
+                    nullptr,
+                    nullptr
+                ) == 0) {
+                    myVarS.clear();
+                }
+            }
+        }
+'@
+
+if (-not $text.Contains($oldQueryConversion)) {
+    throw "Could not locate KeyAuth web-login query conversion block."
+}
+$text = $text.Replace($oldQueryConversion, $newQueryConversion)
+
 Set-Content -LiteralPath $authCpp -Value $text
 
 $pingoutCpp = Join-Path $target "QRCode\pingout.cpp"
