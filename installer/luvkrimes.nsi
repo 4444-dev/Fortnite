@@ -8,6 +8,10 @@ SetCompressor /SOLID lzma
 !error "VERSION define is required"
 !endif
 
+!ifndef NUMERICVERSION
+!error "NUMERICVERSION define is required"
+!endif
+
 !ifndef SOURCEDIR
 !error "SOURCEDIR define is required"
 !endif
@@ -30,6 +34,7 @@ BrandingText "Luvkrimes ${VERSION}"
 ShowInstDetails show
 ShowUninstDetails show
 
+VIProductVersion "${NUMERICVERSION}"
 VIAddVersionKey /LANG=1033 "ProductName" "${PRODUCT_NAME}"
 VIAddVersionKey /LANG=1033 "ProductVersion" "${VERSION}"
 VIAddVersionKey /LANG=1033 "CompanyName" "${PRODUCT_PUBLISHER}"
