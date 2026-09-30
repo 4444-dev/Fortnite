@@ -88,8 +88,8 @@ jobs:
         shell: pwsh
         run: |
           $expected = @(
-            ".\luvkrimes base\x64\${{ matrix.configuration }}\luvkrimes base.exe",
-            ".\loader\bin\x64\${{ matrix.configuration }}\luvkrimes-loader.exe",
+            ".\luvkrimes base\x64\${{ matrix.configuration }}\Nexus-Fortnite.exe",
+            ".\loader\bin\x64\${{ matrix.configuration }}\Nexus.exe",
             ".\tests\bin\x64\${{ matrix.configuration }}\luvkrimes-tests.exe"
           )
 
@@ -124,8 +124,8 @@ jobs:
           & ".\scripts\package-release.ps1" -Version "0.0.0-ci"
 
           $expected = @(
-            ".\dist\Luvkrimes-Setup-0.0.0-ci.exe",
-            ".\dist\Luvkrimes-Portable-0.0.0-ci.zip",
+            ".\dist\Nexus-Setup-0.0.0-ci.exe",
+            ".\dist\Nexus-Portable-0.0.0-ci.zip",
             ".\dist\SHA256SUMS.txt"
           )
 
@@ -139,8 +139,8 @@ jobs:
         if: matrix.configuration == 'Release'
         shell: pwsh
         run: |
-          $installer = (Resolve-Path ".\dist\Luvkrimes-Setup-0.0.0-ci.exe").Path
-          $installDir = Join-Path $env:RUNNER_TEMP "luvkrimes-install"
+          $installer = (Resolve-Path ".\dist\Nexus-Setup-0.0.0-ci.exe").Path
+          $installDir = Join-Path $env:RUNNER_TEMP "nexus-install"
 
           if (Test-Path -LiteralPath $installDir) {
             Remove-Item -LiteralPath $installDir -Recurse -Force
@@ -153,8 +153,8 @@ jobs:
           }
 
           $installed = @(
-            (Join-Path $installDir "Luvkrimes.exe"),
-            (Join-Path $installDir "projects\fortnite\Luvkrimes-Fortnite.exe"),
+            (Join-Path $installDir "Nexus.exe"),
+            (Join-Path $installDir "projects\fortnite\Nexus-Fortnite.exe"),
             (Join-Path $installDir "Uninstall.exe")
           )
 
