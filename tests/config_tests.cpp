@@ -1,5 +1,14 @@
 #include <workspace/util/config/kv_config.hpp>
 
+#include <cstdint>
+using uptr = uintptr_t;
+using u64 = uint64_t;
+using u32 = uint32_t;
+using u16 = uint16_t;
+using u8 = uint8_t;
+using i32 = int32_t;
+#include <workspace/game/unreal/structures.hpp>
+
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -15,9 +24,48 @@ bool Check(bool condition, const char* message) {
 	return true;
 }
 
+bool NearlyEqual(double a, double b, double epsilon = 1e-9) {
+	return std::fabs(a - b) <= epsilon;
+}
+
+bool RunMathTests() {
+	bool ok = true;
+
+	FMatrix identity;
+	for (int i = 0; i < 4; ++i) identity.M[i][i] = 1.0;
+
+	FVector2D screen {};
+	ok &= Check(identity.WorldToScreen({0.0, 0.0, 0.0}, 1920.0, 1080.0, screen) &&
+		NearlyEqual(screen.X, 960.0) && NearlyEqual(screen.Y, 540.0), "identity projection center");
+	ok &= Check(identity.WorldToScreen({1.0, 1.0, 0.0}, 1920.0, 1080.0, screen) &&
+		NearlyEqual(screen.X, 1920.0) && NearlyEqual(screen.Y, 0.0), "identity projection upper-right");
+	ok &= Check(!identity.WorldToScreen({0.0, 0.0, 0.0}, 0.0, 1080.0, screen), "reject zero-width viewport");
+
+	FMatrix behind = identity;
+	behind.M44 = -1.0;
+	ok &= Check(!behind.WorldToScreen({0.0, 0.0, 0.0}, 1920.0, 1080.0, screen), "reject point behind camera");
+
+	FTransform transform;
+	transform.Translation = {10.0, 20.0, 30.0};
+	transform.Scale3D = {2.0, 3.0, 4.0};
+	const FVector transformed = transform.TransformPosition({1.0, 1.0, 1.0});
+	ok &= Check(NearlyEqual(transformed.X, 12.0) && NearlyEqual(transformed.Y, 23.0) &&
+		NearlyEqual(transformed.Z, 34.0), "transform scale and translation");
+
+	const FMatrix transformMatrix = transform.ToMatrixWithScale();
+	const FVector matrixTransformed = transformMatrix.TransformPosition({1.0, 1.0, 1.0});
+	ok &= Check(NearlyEqual(matrixTransformed.X, transformed.X) &&
+		NearlyEqual(matrixTransformed.Y, transformed.Y) && NearlyEqual(matrixTransformed.Z, transformed.Z),
+		"transform matrix agrees with direct transform");
+
+	return ok;
+}
+
 } // namespace
 
 int main() {
+	if (!RunMathTests()) return 1;
+
 	const auto path =
 		std::filesystem::temp_directory_path() /
 		"luvkrimes-config-tests.ini";
