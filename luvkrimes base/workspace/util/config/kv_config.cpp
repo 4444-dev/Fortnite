@@ -1,8 +1,8 @@
 #include <workspace/util/config/kv_config.hpp>
 
 #include <charconv>
-#include <cstdlib>
 #include <cmath>
+#include <limits>
 
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -11,8 +11,6 @@
 #include <Windows.h>
 #endif
 #include <fstream>
-#include <iomanip>
-#include <sstream>
 
 namespace util {
 namespace {
@@ -54,6 +52,10 @@ bool KeyValueConfig::Load(const std::filesystem::path& path) {
 		if (!key.empty()) {
 			parsed[std::move(key)] = std::move(value);
 		}
+	}
+
+	if (input.bad()) {
+		return false;
 	}
 
 	m_Values = std::move(parsed);
@@ -125,9 +127,24 @@ void KeyValueConfig::SetInt(std::string key, int value) {
 }
 
 void KeyValueConfig::SetFloat(std::string key, float value) {
-	std::ostringstream stream;
-	stream << std::setprecision(9) << value;
-	SetString(std::move(key), stream.str());
+	char buffer[64]{};
+	const auto result = std::to_chars(
+		std::begin(buffer),
+		std::end(buffer),
+		value,
+		std::chars_format::general,
+		std::numeric_limits<float>::max_digits10
+	);
+
+	if (result.ec != std::errc{}) {
+		SetString(std::move(key), "0");
+		return;
+	}
+
+	SetString(
+		std::move(key),
+		std::string(buffer, result.ptr)
+	);
 }
 
 std::optional<std::string> KeyValueConfig::GetString(std::string_view key) const {
@@ -179,10 +196,19 @@ bool KeyValueConfig::TryGetFloat(std::string_view key, float& value) const {
 		return false;
 	}
 
-	char* end = nullptr;
-	const float parsed = std::strtof(raw->c_str(), &end);
+	float parsed = 0.0f;
+	const char* begin = raw->data();
+	const char* end = begin + raw->size();
+	const auto result = std::from_chars(
+		begin,
+		end,
+		parsed,
+		std::chars_format::general
+	);
+
 	if (
-		end != raw->c_str() + raw->size() ||
+		result.ec != std::errc{} ||
+		result.ptr != end ||
 		!std::isfinite(parsed)
 	) {
 		return false;
