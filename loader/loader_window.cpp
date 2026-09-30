@@ -19,8 +19,8 @@ namespace {
 
 constexpr wchar_t kClassName[] = L"NexusLoaderWindow";
 constexpr wchar_t kWindowTitle[] = L"Nexus";
-constexpr int kWindowWidth = 620;
-constexpr int kWindowHeight = 390;
+constexpr int kWindowWidth = 1280;
+constexpr int kWindowHeight = 720;
 constexpr int kDragRegionHeight = 38;
 
 } // namespace
@@ -107,6 +107,12 @@ void Window::Show() {
 
 	ShowWindow(m_Hwnd, SW_SHOWDEFAULT);
 	UpdateWindow(m_Hwnd);
+}
+
+void Window::Minimize() {
+	if (m_Hwnd) {
+		ShowWindow(m_Hwnd, SW_MINIMIZE);
+	}
 }
 
 void Window::AttachRenderer(Renderer* renderer) noexcept {
@@ -209,7 +215,15 @@ LRESULT CALLBACK Window::WndProc(
 			};
 			ScreenToClient(hwnd, &point);
 
-			if (point.y >= 0 && point.y < kDragRegionHeight) {
+			RECT client{};
+			GetClientRect(hwnd, &client);
+
+			const int controlsWidth = 460;
+			if (
+				point.y >= 0 &&
+				point.y < kDragRegionHeight &&
+				point.x < client.right - controlsWidth
+			) {
 				return HTCAPTION;
 			}
 		}

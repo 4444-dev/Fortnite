@@ -55,7 +55,15 @@ int WINAPI wWinMain(
 			renderer.BeginFrame();
 
 			bool requestClose = false;
-			ui.Draw(requestClose);
+			bool requestMinimize = false;
+			ui.Draw(
+				requestClose,
+				requestMinimize
+			);
+
+			if (requestMinimize) {
+				window.Minimize();
+			}
 
 			if (!renderer.EndFrame()) {
 				rendererFailed = true;

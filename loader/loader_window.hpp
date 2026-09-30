@@ -27,6 +27,7 @@ public:
 	[[nodiscard]] bool Create();
 	void Destroy();
 	void Show();
+	void Minimize();
 
 	void AttachRenderer(Renderer* renderer) noexcept;
 
