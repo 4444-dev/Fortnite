@@ -24,6 +24,28 @@ on pull requests targeting `main`, and on pushes to `main`.
 
 The same matrix builds and executes the standalone regression tests in `tests/` twice per configuration to catch state leakage between runs. CI also verifies that the application, loader and test executables were actually produced before running the test binary. First-party C++ warnings and all linker warnings are treated as errors; the current Debug and Release builds complete with zero compiler/linker warnings.
 
+## Distribution
+
+Client distribution is produced from tested `Release | x64` binaries. The packaging pipeline creates:
+
+- `Luvkrimes-Setup-<version>.exe` — per-user Windows installer
+- `Luvkrimes-Portable-<version>.zip` — portable package with the same runtime layout
+- `SHA256SUMS.txt` — SHA-256 checksums for both downloadable packages
+
+The installer uses NSIS 3.12.0, installs under `%LOCALAPPDATA%\Programs\Luvkrimes`, creates Start Menu and desktop shortcuts, registers a normal Windows uninstaller, and does not require administrator rights. Uninstalling removes the installed program but intentionally preserves settings, logs and remembered-license data under `%LOCALAPPDATA%\luvkrimes`.
+
+The packaged loader resolves Fortnite automatically from `projects\fortnite\Luvkrimes-Fortnite.exe` next to the loader. `LUVKRIMES_TARGET_FORTNITE` remains available as an explicit development override, so customers do not need to configure environment variables manually.
+
+CI builds the package on every Release configuration and performs a silent install/verify/uninstall round-trip before the build can pass.
+
+`.github/workflows/release.yml` publishes a GitHub Release only for semantic-version tags such as `v1.0.0`, and only when the tagged commit is already contained in `main`. The published assets are the installer, portable ZIP and checksum file. Example:
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Authenticode signing is optional. If repository secrets `WINDOWS_CERTIFICATE_BASE64` and `WINDOWS_CERTIFICATE_PASSWORD` are configured, the release workflow signs the release binaries and installer before publication. Without those secrets, the packages are still built and published but Windows may identify the publisher as unknown.
 ## Runtime architecture
 
 - `main.cpp` — application startup and shutdown
@@ -94,7 +116,7 @@ Fortnite and Apex must use different KeyAuth applications if their key pools mus
 
 The loader supports license-key authentication, 60-second session revalidation, and optional remembered-license storage using Windows DPAPI. Remembered license material is split by product under `%LOCALAPPDATA%\luvkrimes\licenses\<product>.dat`, encrypted for the current Windows account and cryptographically bound to the product slug through DPAPI optional entropy. Legacy remembered-license files are accepted once and transparently migrated to the bound format.
 
-Post-authentication launch targets are product-specific:
+Post-authentication launch targets are product-specific. Packaged products use their relative installed/portable executable automatically; environment variables remain optional overrides for development:
 - `LUVKRIMES_TARGET_FORTNITE`
 - `LUVKRIMES_TARGET_APEX`
 
