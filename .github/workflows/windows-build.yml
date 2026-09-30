@@ -34,6 +34,15 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Checkout pinned Apex radar
+        if: matrix.configuration == 'Release'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: 4444-dev/Apex
+          ref: c7df9610d51efa2c236b07ccd04b74e660f08e30
+          path: external/apex
+          persist-credentials: false
+
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
         with:
@@ -155,6 +164,8 @@ jobs:
           $installed = @(
             (Join-Path $installDir "Nexus.exe"),
             (Join-Path $installDir "projects\fortnite\Nexus-Fortnite.exe"),
+            (Join-Path $installDir "projects\apex\Nexus-Apex-Radar.exe"),
+            (Join-Path $installDir "projects\apex\web\radar.html"),
             (Join-Path $installDir "Uninstall.exe")
           )
 
@@ -171,7 +182,7 @@ jobs:
             throw "Silent uninstaller failed with exit code $($uninstall.ExitCode)."
           }
 
-          foreach ($path in $installed[0..1]) {
+          foreach ($path in $installed[0..3]) {
             if (Test-Path -LiteralPath $path) {
               throw "Uninstaller left product binary behind: $path"
             }
