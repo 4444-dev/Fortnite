@@ -1,10 +1,10 @@
-#define IMGUI_DEFINE_MATH_OPERATORS
-
 #include <workspace/interface/menu.hpp>
 #include <workspace/interface/settings_store.hpp>
-#include <thirdparty/imgui/imgui_internal.h>
 
 #include <Windows.h>
+#include <thirdparty/imgui/imgui.h>
+
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 
@@ -12,570 +12,899 @@ using menu::cfg;
 
 namespace {
 
-	const menu::Settings cfg_default {};
+const menu::Settings cfg_default{};
 
-	ImFont*         font      = nullptr;
-	constexpr float font_size = 12.0f;
+ImFont* font_regular = nullptr;
+ImFont* font_title = nullptr;
+int active_tab = 0;
 
-	namespace col {
-		const ImU32 black      = IM_COL32(   0,   0,   0, 255 );
-		const ImU32 window     = IM_COL32(  17,  17,  17, 255 );
-		const ImU32 edge       = IM_COL32(  48,  48,  48, 255 );
-		const ImU32 group      = IM_COL32(  22,  22,  22, 255 );
-		const ImU32 group_edge = IM_COL32(  40,  40,  40, 255 );
-		const ImU32 ctrl_top   = IM_COL32(  44,  44,  44, 255 );
-		const ImU32 ctrl_bot   = IM_COL32(  33,  33,  33, 255 );
-		const ImU32 ctrl_hover = IM_COL32(  54,  54,  54, 255 );
-		const ImU32 off_top    = IM_COL32(  72,  72,  72, 255 );
-		const ImU32 off_bot    = IM_COL32(  50,  50,  50, 255 );
-		const ImU32 off_hover  = IM_COL32(  90,  90,  90, 255 );
-		const ImU32 text       = IM_COL32( 200, 200, 200, 255 );
-		const ImU32 bright     = IM_COL32( 240, 240, 240, 255 );
-		const ImU32 dim        = IM_COL32( 115, 115, 115, 255 );
+namespace palette {
+constexpr ImU32 background = IM_COL32(8, 10, 18, 248);
+constexpr ImU32 panel = IM_COL32(16, 20, 33, 248);
+constexpr ImU32 panel_alt = IM_COL32(21, 26, 43, 248);
+constexpr ImU32 border = IM_COL32(39, 45, 69, 255);
+constexpr ImU32 text = IM_COL32(244, 245, 250, 255);
+constexpr ImU32 muted = IM_COL32(150, 158, 183, 255);
+constexpr ImU32 success = IM_COL32(56, 228, 123, 255);
+constexpr ImU32 warning = IM_COL32(247, 185, 85, 255);
+constexpr ImU32 danger = IM_COL32(255, 92, 112, 255);
+}
+
+ImU32 Accent(float alpha = 1.0f) {
+	return ImGui::ColorConvertFloat4ToU32(
+		ImVec4(
+			cfg.accent[0],
+			cfg.accent[1],
+			cfg.accent[2],
+			std::clamp(alpha, 0.0f, 1.0f)
+		)
+	);
+}
+
+void DrawBrand() {
+	ImDrawList* draw = ImGui::GetWindowDrawList();
+	const ImVec2 pos = ImGui::GetCursorScreenPos();
+
+	ImGui::PushFont(font_title);
+	const ImVec2 neSize = ImGui::CalcTextSize("NE");
+	ImGui::PopFont();
+
+	draw->AddText(
+		font_title,
+		22.0f,
+		pos,
+		palette::text,
+		"NE"
+	);
+	draw->AddText(
+		font_title,
+		22.0f,
+		ImVec2(pos.x + neSize.x, pos.y),
+		Accent(),
+		"XUS"
+	);
+
+	ImGui::Dummy(ImVec2(96.0f, 26.0f));
+}
+
+bool Switch(const char* id, bool* value) {
+	ImGui::PushID(id);
+
+	const ImVec2 pos = ImGui::GetCursorScreenPos();
+	const ImVec2 size(42.0f, 22.0f);
+	const bool pressed =
+		ImGui::InvisibleButton("##switch", size);
+
+	if (pressed) {
+		*value = !*value;
 	}
 
-	constexpr float indent = 20.0f;
+	const bool hovered = ImGui::IsItemHovered();
+	ImDrawList* draw = ImGui::GetWindowDrawList();
 
-	int tab = 0;
+	const ImU32 track =
+		*value
+			? Accent(hovered ? 1.0f : 0.88f)
+			: hovered
+				? IM_COL32(66, 73, 100, 255)
+				: IM_COL32(46, 52, 75, 255);
 
-	ImU32 accent( float shade = 1.0f ) {
-		return ImGui::ColorConvertFloat4ToU32( ImVec4( cfg.accent[ 0 ] * shade, cfg.accent[ 1 ] * shade, cfg.accent[ 2 ] * shade, 1.0f ) );
+	draw->AddRectFilled(
+		pos,
+		pos + size,
+		track,
+		11.0f
+	);
+
+	const float knobX =
+		*value
+			? pos.x + size.x - 11.0f
+			: pos.x + 11.0f;
+
+	draw->AddCircleFilled(
+		ImVec2(knobX, pos.y + 11.0f),
+		7.0f,
+		IM_COL32(245, 247, 255, 255)
+	);
+
+	ImGui::PopID();
+	return pressed;
+}
+
+void SettingToggle(
+	const char* label,
+	bool* value,
+	float* color = nullptr
+) {
+	ImGui::AlignTextToFramePadding();
+	ImGui::TextUnformatted(label);
+
+	const float available =
+		ImGui::GetContentRegionAvail().x;
+
+	if (color) {
+		ImGui::SameLine(
+			ImGui::GetCursorPosX() +
+			(std::max)(0.0f, available - 82.0f)
+		);
+
+		ImGui::SetNextItemWidth(30.0f);
+		ImGui::ColorEdit4(
+			"##color",
+			color,
+			ImGuiColorEditFlags_NoInputs |
+			ImGuiColorEditFlags_NoLabel |
+			ImGuiColorEditFlags_AlphaPreviewHalf
+		);
+
+		ImGui::SameLine(0.0f, 10.0f);
+	} else {
+		ImGui::SameLine(
+			ImGui::GetCursorPosX() +
+			(std::max)(0.0f, available - 42.0f)
+		);
 	}
 
-	ImVec2 text_size( const char* s ) {
-		return font->CalcTextSizeA( font_size, FLT_MAX, 0.0f, s );
+	Switch(label, value);
+	ImGui::Dummy(ImVec2(0.0f, 4.0f));
+}
+
+void ComboRow(
+	const char* label,
+	int* value,
+	const char* const* items,
+	int count
+) {
+	ImGui::AlignTextToFramePadding();
+	ImGui::TextUnformatted(label);
+
+	ImGui::SameLine();
+	const float width = 160.0f;
+	ImGui::SetCursorPosX(
+		ImGui::GetWindowContentRegionMax().x -
+		width
+	);
+	ImGui::SetNextItemWidth(width);
+
+	ImGui::PushID(label);
+	ImGui::Combo(
+		"##combo",
+		value,
+		items,
+		count
+	);
+	ImGui::PopID();
+
+	ImGui::Dummy(ImVec2(0.0f, 4.0f));
+}
+
+void BeginCard(
+	const char* id,
+	const ImVec2& size
+) {
+	ImGui::PushStyleVar(
+		ImGuiStyleVar_ChildRounding,
+		10.0f
+	);
+	ImGui::PushStyleVar(
+		ImGuiStyleVar_ChildBorderSize,
+		1.0f
+	);
+	ImGui::PushStyleVar(
+		ImGuiStyleVar_WindowPadding,
+		ImVec2(18.0f, 16.0f)
+	);
+	ImGui::PushStyleColor(
+		ImGuiCol_ChildBg,
+		ImGui::ColorConvertU32ToFloat4(
+			palette::panel
+		)
+	);
+	ImGui::PushStyleColor(
+		ImGuiCol_Border,
+		ImGui::ColorConvertU32ToFloat4(
+			palette::border
+		)
+	);
+
+	ImGui::BeginChild(
+		id,
+		size,
+		true,
+		ImGuiWindowFlags_NoScrollbar
+	);
+}
+
+void EndCard() {
+	ImGui::EndChild();
+	ImGui::PopStyleColor(2);
+	ImGui::PopStyleVar(3);
+}
+
+void CardHeader(
+	const char* title,
+	const char* subtitle = nullptr
+) {
+	ImGui::PushFont(font_title);
+	ImGui::TextUnformatted(title);
+	ImGui::PopFont();
+
+	if (subtitle && *subtitle) {
+		ImGui::PushStyleColor(
+			ImGuiCol_Text,
+			ImGui::ColorConvertU32ToFloat4(
+				palette::muted
+			)
+		);
+		ImGui::TextWrapped("%s", subtitle);
+		ImGui::PopStyleColor();
 	}
 
-	void text( ImDrawList* dl, ImVec2 p, ImU32 c, const char* s ) {
-		dl->AddText( font, font_size, ImFloor( p ), c, s );
+	ImGui::Dummy(ImVec2(0.0f, 8.0f));
+}
+
+void StatusLine(
+	const char* label,
+	const char* value,
+	ImU32 valueColor = palette::text
+) {
+	ImGui::TextDisabled("%s", label);
+	ImGui::SameLine();
+
+	const ImVec2 valueSize =
+		ImGui::CalcTextSize(value);
+
+	ImGui::SetCursorPosX(
+		ImGui::GetWindowContentRegionMax().x -
+		valueSize.x
+	);
+
+	ImGui::PushStyleColor(
+		ImGuiCol_Text,
+		ImGui::ColorConvertU32ToFloat4(valueColor)
+	);
+	ImGui::TextUnformatted(value);
+	ImGui::PopStyleColor();
+}
+
+void KeyName(
+	int key,
+	char* out,
+	size_t size
+) {
+	const char* name = "None";
+
+	if (key != ImGuiKey_None) {
+		name =
+			ImGui::GetKeyName(
+				static_cast<ImGuiKey>(key)
+			);
 	}
 
-	float text_y( float top, float h ) {
-		return top + ImFloor( ( h - font_size ) * 0.5f ) - 1.0f;
+	size_t index = 0;
+	for (
+		;
+		name[index] && index + 1 < size;
+		++index
+	) {
+		out[index] =
+			static_cast<char>(
+				std::toupper(
+					static_cast<unsigned char>(
+						name[index]
+					)
+				)
+			);
+	}
+	out[index] = '\0';
+}
+
+bool KeybindRow(
+	const char* label,
+	int* key
+) {
+	static ImGuiID waitingId = 0;
+	static int waitingFrame = 0;
+
+	ImGui::AlignTextToFramePadding();
+	ImGui::TextUnformatted(label);
+
+	char keyText[48]{};
+	KeyName(*key, keyText, sizeof(keyText));
+
+	ImGui::SameLine();
+	const float buttonWidth = 112.0f;
+	ImGui::SetCursorPosX(
+		ImGui::GetWindowContentRegionMax().x -
+		buttonWidth
+	);
+
+	ImGui::PushID(label);
+	const ImGuiID id =
+		ImGui::GetID("##keybind");
+
+	const bool waiting =
+		waitingId == id;
+
+	if (ImGui::Button(
+		waiting ? "PRESS A KEY..." : keyText,
+		ImVec2(buttonWidth, 0.0f)
+	)) {
+		waitingId = id;
+		waitingFrame = ImGui::GetFrameCount();
 	}
 
-	void frame( ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 top, ImU32 bottom ) {
-		dl->AddRectFilledMultiColor( a, b, top, top, bottom, bottom );
-		dl->AddRect( a - ImVec2( 1, 1 ), b + ImVec2( 1, 1 ), col::black );
-	}
+	bool changed = false;
 
-	void begin_popup_style( ImVec2 padding ) {
-		ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding, padding );
-		ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, ImVec2( 0, 0 ) );
-		ImGui::PushStyleColor( ImGuiCol_PopupBg, col::group );
-		ImGui::PushStyleColor( ImGuiCol_Border, col::black );
-	}
+	if (
+		waiting &&
+		ImGui::GetFrameCount() > waitingFrame
+	) {
+		if (ImGui::IsKeyPressed(
+			ImGuiKey_Escape,
+			false
+		)) {
+			waitingId = 0;
+		} else {
+			for (
+				int candidate = ImGuiKey_NamedKey_BEGIN;
+				candidate < ImGuiKey_NamedKey_END;
+				++candidate
+			) {
+				if (
+					candidate == ImGuiKey_MouseLeft ||
+					candidate == ImGuiKey_MouseWheelX ||
+					candidate == ImGuiKey_MouseWheelY
+				) {
+					continue;
+				}
 
-	void end_popup_style( ) {
-		ImGui::PopStyleColor( 2 );
-		ImGui::PopStyleVar( 2 );
-	}
-
-	void swatch( ImDrawList* dl, const ImRect& r, const float* c, bool hovered ) {
-		const ImVec4 top( c[ 0 ], c[ 1 ], c[ 2 ], 1.0f );
-		const ImVec4 bot( c[ 0 ] * 0.75f, c[ 1 ] * 0.75f, c[ 2 ] * 0.75f, 1.0f );
-		frame( dl, r.Min, r.Max, ImGui::ColorConvertFloat4ToU32( top ), ImGui::ColorConvertFloat4ToU32( bot ) );
-		if ( hovered )
-			dl->AddRect( r.Min, r.Max, IM_COL32( 255, 255, 255, 60 ) );
-	}
-
-	void color_popup( const char* popup_id, float* c, ImVec2 anchor ) {
-		ImGui::SetNextWindowPos( anchor, ImGuiCond_Appearing );
-		begin_popup_style( ImVec2( 6, 6 ) );
-		if ( ImGui::BeginPopup( popup_id, ImGuiWindowFlags_NoMove ) ) {
-			ImGui::SetNextItemWidth( 170.0f );
-			ImGui::ColorPicker4( "##picker", c,
-				ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview |
-				ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_AlphaBar );
-			ImGui::EndPopup( );
-		}
-		end_popup_style( );
-	}
-
-	bool checkbox( const char* label, bool* v, float* color = nullptr ) {
-		ImGuiWindow* win = ImGui::GetCurrentWindow( );
-		if ( win->SkipItems ) return false;
-
-		const ImGuiID id = win->GetID( label );
-		const float   w  = ImGui::GetContentRegionAvail( ).x;
-		const float   h  = 18.0f;
-		const ImVec2  p  = win->DC.CursorPos;
-		const ImRect  bb( p, p + ImVec2( w, h ) );
-		ImGui::ItemSize( bb );
-		if ( !ImGui::ItemAdd( bb, id ) ) return false;
-
-		const ImRect sw( ImVec2( bb.Max.x - 18.0f, p.y + 5.0f ), ImVec2( bb.Max.x, p.y + 13.0f ) );
-		const bool over_swatch = color && ( !v || sw.Contains( ImGui::GetIO( ).MousePos ) );
-
-		bool hovered, held;
-		const bool pressed = ImGui::ButtonBehavior( bb, id, &hovered, &held );
-
-		char popup_id[ 32 ];
-		ImFormatString( popup_id, IM_ARRAYSIZE( popup_id ), "##clr_%08X", id );
-
-		bool changed = false;
-		if ( pressed ) {
-			if ( over_swatch )
-				ImGui::OpenPopup( popup_id );
-			else if ( v ) {
-				*v = !*v;
-				changed = true;
-			}
-		}
-
-		ImDrawList* dl = win->DrawList;
-		const bool box_hover = hovered && !over_swatch;
-
-		if ( v ) {
-			const ImVec2 b0( p.x + 2.0f, p.y + 5.0f );
-			const ImVec2 b1 = b0 + ImVec2( 8.0f, 8.0f );
-			if ( *v ) frame( dl, b0, b1, accent( ), accent( 0.6f ) );
-			else      frame( dl, b0, b1, box_hover ? col::off_hover : col::off_top, col::off_bot );
-		}
-
-		text( dl, ImVec2( p.x + indent, text_y( p.y, h ) ), box_hover ? col::bright : col::text, label );
-
-		if ( color ) {
-			swatch( dl, sw, color, hovered && over_swatch );
-			color_popup( popup_id, color, ImVec2( sw.Min.x - 1.0f, sw.Max.y + 4.0f ) );
-		}
-
-		return changed;
-	}
-
-	bool list_item( const char* label, bool selected ) {
-		ImGuiWindow* win = ImGui::GetCurrentWindow( );
-		const ImGuiID id = win->GetID( label );
-		const float   w  = ImGui::GetContentRegionAvail( ).x;
-		const ImVec2  p  = win->DC.CursorPos;
-		const ImRect  bb( p, p + ImVec2( w, 18.0f ) );
-		ImGui::ItemSize( bb );
-		if ( !ImGui::ItemAdd( bb, id ) ) return false;
-
-		bool hovered, held;
-		const bool pressed = ImGui::ButtonBehavior( bb, id, &hovered, &held );
-
-		ImDrawList* dl = win->DrawList;
-		if ( hovered )
-			dl->AddRectFilled( bb.Min, bb.Max, col::ctrl_hover );
-		text( dl, ImVec2( p.x + 6.0f, text_y( p.y, 18.0f ) ), selected ? accent( ) : ( hovered ? col::bright : col::text ), label );
-		return pressed;
-	}
-
-	bool combo( const char* label, int* v, const char* const* items, int count ) {
-		ImGuiWindow* win = ImGui::GetCurrentWindow( );
-		if ( win->SkipItems ) return false;
-
-		const ImGuiID id  = win->GetID( label );
-		const bool    has_label = label[ 0 ] != '#';
-		const float   lh  = has_label ? 16.0f : 0.0f;
-		const float   w   = ImGui::GetContentRegionAvail( ).x;
-		const ImVec2  p   = win->DC.CursorPos;
-		const ImRect  bb( p, p + ImVec2( w, lh + 24.0f ) );
-		const ImRect  box( ImVec2( p.x + indent, p.y + lh + 2.0f ), ImVec2( bb.Max.x, p.y + lh + 20.0f ) );
-		ImGui::ItemSize( bb );
-		if ( !ImGui::ItemAdd( bb, id ) ) return false;
-
-		char popup_id[ 64 ];
-		ImFormatString( popup_id, IM_ARRAYSIZE( popup_id ), "##combo_%08X", id );
-
-		bool hovered, held;
-		if ( ImGui::ButtonBehavior( box, id, &hovered, &held ) && !ImGui::IsPopupOpen( popup_id ) )
-			ImGui::OpenPopup( popup_id );
-		const bool open = ImGui::IsPopupOpen( popup_id );
-
-		ImDrawList* dl = win->DrawList;
-		if ( has_label )
-			text( dl, ImVec2( p.x + indent, p.y ), col::text, label );
-
-		frame( dl, box.Min, box.Max, ( hovered || open ) ? col::ctrl_hover : col::ctrl_top, col::ctrl_bot );
-		text( dl, ImVec2( box.Min.x + 6.0f, text_y( box.Min.y, box.GetHeight( ) ) ), col::text, items[ *v ] );
-
-		const ImVec2 a( box.Max.x - 10.0f, box.GetCenter( ).y );
-		if ( open ) dl->AddTriangleFilled( a + ImVec2( -3, 2 ), a + ImVec2( 3, 2 ), a + ImVec2( 0, -2 ), col::dim );
-		else        dl->AddTriangleFilled( a + ImVec2( -3, -2 ), a + ImVec2( 3, -2 ), a + ImVec2( 0, 2 ), col::dim );
-
-		bool changed = false;
-		ImGui::SetNextWindowPos( ImVec2( box.Min.x, box.Max.y + 2.0f ) );
-		ImGui::SetNextWindowSize( ImVec2( box.GetWidth( ), 0.0f ) );
-		begin_popup_style( ImVec2( 1, 1 ) );
-		if ( ImGui::BeginPopup( popup_id, ImGuiWindowFlags_NoMove ) ) {
-			for ( int i = 0; i < count; ++i ) {
-				ImGui::PushID( i );
-				if ( list_item( items[ i ], *v == i ) ) {
-					*v = i;
+				if (ImGui::IsKeyPressed(
+					static_cast<ImGuiKey>(
+						candidate
+					),
+					false
+				)) {
+					*key = candidate;
+					waitingId = 0;
 					changed = true;
-					ImGui::CloseCurrentPopup( );
-				}
-				ImGui::PopID( );
-			}
-			ImGui::EndPopup( );
-		}
-		end_popup_style( );
-		return changed;
-	}
-
-	bool slider( const char* label, float* v, float v_min, float v_max, const char* fmt ) {
-		ImGuiWindow* win = ImGui::GetCurrentWindow( );
-		if ( win->SkipItems ) return false;
-
-		const ImGuiID id = win->GetID( label );
-		const float   w  = ImGui::GetContentRegionAvail( ).x;
-		const ImVec2  p  = win->DC.CursorPos;
-		const ImRect  bb( p, p + ImVec2( w, 38.0f ) );
-		const ImRect  bar( ImVec2( p.x + indent, p.y + 19.0f ), ImVec2( bb.Max.x, p.y + 25.0f ) );
-		ImGui::ItemSize( bb );
-		if ( !ImGui::ItemAdd( bb, id ) ) return false;
-
-		bool hovered, held;
-		const ImRect hit( bar.Min - ImVec2( 0, 4 ), bar.Max + ImVec2( 0, 4 ) );
-		ImGui::ButtonBehavior( hit, id, &hovered, &held, ImGuiButtonFlags_PressedOnClick );
-
-		bool changed = false;
-		if ( held ) {
-			const float t = ImSaturate( ( ImGui::GetIO( ).MousePos.x - bar.Min.x ) / bar.GetWidth( ) );
-			const float nv = v_min + t * ( v_max - v_min );
-			if ( nv != *v ) {
-				*v = nv;
-				changed = true;
-			}
-		}
-
-		ImDrawList* dl = win->DrawList;
-		text( dl, ImVec2( p.x + indent, p.y ), col::text, label );
-
-		const float t = ImSaturate( ( *v - v_min ) / ( v_max - v_min ) );
-		const float fill_x = ImFloor( bar.Min.x + bar.GetWidth( ) * t );
-		frame( dl, bar.Min, bar.Max, ( hovered || held ) ? col::ctrl_hover : col::ctrl_top, col::ctrl_bot );
-		if ( fill_x > bar.Min.x )
-			dl->AddRectFilledMultiColor( bar.Min, ImVec2( fill_x, bar.Max.y ), accent( ), accent( ), accent( 0.6f ), accent( 0.6f ) );
-
-		char buf[ 32 ];
-		ImFormatString( buf, IM_ARRAYSIZE( buf ), fmt, *v );
-		const ImVec2 vs = text_size( buf );
-		const float vx = ImClamp( fill_x - vs.x * 0.5f, bar.Min.x, bar.Max.x - vs.x );
-		dl->AddText( font, font_size, ImFloor( ImVec2( vx + 1, bar.Max.y + 2 ) ), col::black, buf );
-		dl->AddText( font, font_size, ImFloor( ImVec2( vx, bar.Max.y + 1 ) ), col::text, buf );
-
-		return changed;
-	}
-
-	void key_name( int key, char* out, size_t size ) {
-		const char* name = "none";
-		switch ( key ) {
-		case ImGuiKey_None:        break;
-		case ImGuiKey_MouseRight:  name = "mouse2"; break;
-		case ImGuiKey_MouseMiddle: name = "mouse3"; break;
-		case ImGuiKey_MouseX1:     name = "mouse4"; break;
-		case ImGuiKey_MouseX2:     name = "mouse5"; break;
-		default:                   name = ImGui::GetKeyName( static_cast< ImGuiKey >( key ) ); break;
-		}
-		size_t i = 0;
-		for ( ; name[ i ] && i + 1 < size; ++i )
-			out[ i ] = static_cast< char >( std::tolower( static_cast< unsigned char >( name[ i ] ) ) );
-		out[ i ] = '\0';
-	}
-
-	bool keybind( const char* label, int* key ) {
-		ImGuiWindow* win = ImGui::GetCurrentWindow( );
-		if ( win->SkipItems ) return false;
-
-		static ImGuiID waiting_id    = 0;
-		static int     waiting_frame = 0;
-
-		const ImGuiID id = win->GetID( label );
-		const float   w  = ImGui::GetContentRegionAvail( ).x;
-		const float   h  = 18.0f;
-		const ImVec2  p  = win->DC.CursorPos;
-		const ImRect  bb( p, p + ImVec2( w, h ) );
-		ImGui::ItemSize( bb );
-		if ( !ImGui::ItemAdd( bb, id ) ) return false;
-
-		bool hovered, held;
-		if ( ImGui::ButtonBehavior( bb, id, &hovered, &held ) ) {
-			waiting_id    = id;
-			waiting_frame = ImGui::GetFrameCount( );
-		}
-
-		bool changed = false;
-		if ( waiting_id == id && ImGui::GetFrameCount( ) > waiting_frame ) {
-			if ( ImGui::IsKeyPressed( ImGuiKey_Escape, false ) || ImGui::IsMouseClicked( ImGuiMouseButton_Left ) )
-				waiting_id = 0;
-			else {
-				for ( int k = ImGuiKey_NamedKey_BEGIN; k < ImGuiKey_NamedKey_END; ++k ) {
-					if ( k == ImGuiKey_MouseLeft || k == ImGuiKey_MouseWheelX || k == ImGuiKey_MouseWheelY )
-						continue;
-					if ( k >= ImGuiKey_ReservedForModCtrl && k <= ImGuiKey_ReservedForModSuper )
-						continue;
-					if ( ImGui::IsKeyPressed( static_cast< ImGuiKey >( k ), false ) ) {
-						*key = k;
-						waiting_id = 0;
-						changed = true;
-						break;
-					}
+					break;
 				}
 			}
 		}
-		const bool waiting = waiting_id == id;
-
-		ImDrawList* dl = win->DrawList;
-		text( dl, ImVec2( p.x + indent, text_y( p.y, h ) ), hovered ? col::bright : col::text, label );
-
-		char name[ 32 ];
-		key_name( *key, name, sizeof( name ) );
-		char buf[ 40 ];
-		ImFormatString( buf, IM_ARRAYSIZE( buf ), "[%s]", waiting ? "..." : name );
-		const ImVec2 bs = text_size( buf );
-		text( dl, ImVec2( bb.Max.x - bs.x, text_y( p.y, h ) ), waiting ? accent( ) : col::dim, buf );
-
-		return changed;
 	}
 
-	bool button( const char* label ) {
-		ImGuiWindow* win = ImGui::GetCurrentWindow( );
-		if ( win->SkipItems ) return false;
-
-		const ImGuiID id = win->GetID( label );
-		const float   w  = ImGui::GetContentRegionAvail( ).x;
-		const ImVec2  p  = win->DC.CursorPos;
-		const ImRect  bb( p, p + ImVec2( w, 26.0f ) );
-		const ImRect  box( ImVec2( p.x + indent, p.y + 3.0f ), ImVec2( bb.Max.x, p.y + 23.0f ) );
-		ImGui::ItemSize( bb );
-		if ( !ImGui::ItemAdd( bb, id ) ) return false;
-
-		bool hovered, held;
-		const bool pressed = ImGui::ButtonBehavior( box, id, &hovered, &held );
-
-		ImDrawList* dl = win->DrawList;
-		frame( dl, box.Min, box.Max, held ? col::ctrl_bot : ( hovered ? col::ctrl_hover : col::ctrl_top ), held ? col::ctrl_top : col::ctrl_bot );
-		const ImVec2 ls = text_size( label );
-		text( dl, ImVec2( box.GetCenter( ).x - ls.x * 0.5f, text_y( box.Min.y, box.GetHeight( ) ) ), hovered ? col::bright : col::text, label );
-		return pressed;
-	}
-
-	void info( const char* label, const char* value ) {
-		ImGuiWindow* win = ImGui::GetCurrentWindow( );
-		if ( win->SkipItems ) return;
-
-		const float  w = ImGui::GetContentRegionAvail( ).x;
-		const ImVec2 p = win->DC.CursorPos;
-		const ImRect bb( p, p + ImVec2( w, 18.0f ) );
-		ImGui::ItemSize( bb );
-		if ( !ImGui::ItemAdd( bb, 0 ) ) return;
-
-		ImDrawList* dl = win->DrawList;
-		text( dl, ImVec2( p.x + indent, text_y( p.y, 18.0f ) ), col::text, label );
-		const ImVec2 vs = text_size( value );
-		text( dl, ImVec2( bb.Max.x - vs.x, text_y( p.y, 18.0f ) ), col::dim, value );
-	}
-
-	void begin_group( const char* title, ImVec2 size ) {
-		const ImVec2 p = ImGui::GetCursorScreenPos( );
-		ImDrawList* dl = ImGui::GetWindowDrawList( );
-
-		const ImVec2 a( p.x, p.y + 6.0f );
-		const ImVec2 b = p + size;
-		dl->AddRectFilled( a, b, col::group );
-		dl->AddRect( a, b, col::black );
-		dl->AddRect( a + ImVec2( 1, 1 ), b - ImVec2( 1, 1 ), col::group_edge );
-
-		const ImVec2 ts = text_size( title );
-		dl->AddRectFilled( ImVec2( a.x + 8.0f, a.y - 1.0f ), ImVec2( a.x + 14.0f + ts.x, a.y + 2.0f ), col::group );
-		text( dl, ImVec2( a.x + 11.0f, a.y - ImFloor( font_size * 0.5f ) - 1.0f ), col::text, title );
-
-		ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding, ImVec2( 14, 20 ) );
-		ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, ImVec2( 0, 2 ) );
-		ImGui::BeginChild( title, size, ImGuiChildFlags_AlwaysUseWindowPadding,
-			ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground );
-	}
-
-	void end_group( ) {
-		ImGui::EndChild( );
-		ImGui::PopStyleVar( 2 );
-	}
-
-	void page_visuals( ImVec2 avail ) {
-		const float col_w = ImFloor( ( avail.x - 12.0f ) * 0.5f );
-		static const char* box_styles[ ] = { "full", "corner" };
-		static const char* origins[ ]    = { "bottom", "center", "top" };
-
-		begin_group( "players", ImVec2( col_w, avail.y ) );
-		checkbox( "bounding box", &cfg.box, cfg.box_color );
-		combo( "##box_style", &cfg.box_style, box_styles, IM_ARRAYSIZE( box_styles ) );
-		checkbox( "box fill", &cfg.box_fill );
-		checkbox( "skeleton", &cfg.skeleton, cfg.skeleton_color );
-		checkbox( "distance", &cfg.distance );
-		end_group( );
-
-		ImGui::SameLine( 0, 12.0f );
-
-		begin_group( "snaplines", ImVec2( avail.x - col_w - 12.0f, avail.y ) );
-		checkbox( "enabled", &cfg.snaplines, cfg.snapline_color );
-		combo( "origin", &cfg.snapline_origin, origins, IM_ARRAYSIZE( origins ) );
-		end_group( );
-	}
-
-	void page_config( ImVec2 avail, const menu::RuntimeStatus& status ) {
-		const float col_w = ImFloor( ( avail.x - 12.0f ) * 0.5f );
-
-		begin_group( "menu", ImVec2( col_w, avail.y ) );
-		keybind( "menu key", &cfg.menu_key );
-		checkbox( "accent color", nullptr, cfg.accent );
-		ImGui::Dummy( ImVec2( 0, 6 ) );
-		if ( button( "save settings" ) )
-			( void )app_settings::Save( cfg );
-		if ( button( "load settings" ) )
-			( void )app_settings::Load( cfg );
-		if ( button( "restore defaults" ) )
-			cfg = cfg_default;
-		end_group( );
-
-		ImGui::SameLine( 0, 12.0f );
-
-		begin_group( "info", ImVec2( avail.x - col_w - 12.0f, avail.y ) );
-		info( "build", "1.0" );
-		info( "game", "fortnite" );
-		info( "world", status.world_valid ? "ok" : "invalid" );
-		info( "camera", status.camera_valid ? "ok" : "invalid" );
-
-		char actors[ 16 ] {};
-		std::snprintf( actors, sizeof( actors ), "%d", status.actor_count );
-		info( "actors", actors );
-
-		char players[ 16 ] {};
-		std::snprintf( players, sizeof( players ), "%d", status.player_count );
-		info( "players", players );
-
-		char fps[ 16 ] {};
-		std::snprintf( fps, sizeof( fps ), "%.0f", status.fps );
-		info( "fps", fps );
-
-		char frameMs[ 24 ] {};
-		std::snprintf( frameMs, sizeof( frameMs ), "%.2f ms", status.frame_ms );
-		info( "frame", frameMs );
-
-		char engineMs[ 24 ] {};
-		std::snprintf( engineMs, sizeof( engineMs ), "%.3f ms", status.engine_ms );
-		info( "engine", engineMs );
-
-		char actorsMs[ 24 ] {};
-		std::snprintf( actorsMs, sizeof( actorsMs ), "%.3f ms", status.actors_ms );
-		info( "actor scan", actorsMs );
-
-		char playersMs[ 24 ] {};
-		std::snprintf( playersMs, sizeof( playersMs ), "%.3f ms", status.players_ms );
-		info( "player cache", playersMs );
-
-		char dpiScale[ 24 ] {};
-		std::snprintf( dpiScale, sizeof( dpiScale ), "%.2fx", status.dpi_scale );
-		info( "dpi", dpiScale );
-		end_group( );
-	}
-
-	bool tab_button( const char* label, bool active, ImVec2 size ) {
-		ImGuiWindow* win = ImGui::GetCurrentWindow( );
-		const ImGuiID id = win->GetID( label );
-		const ImVec2  p  = win->DC.CursorPos;
-		const ImRect  bb( p, p + size );
-		ImGui::ItemSize( bb );
-		if ( !ImGui::ItemAdd( bb, id ) ) return false;
-
-		bool hovered, held;
-		const bool pressed = ImGui::ButtonBehavior( bb, id, &hovered, &held );
-
-		ImDrawList* dl = win->DrawList;
-		if ( active ) frame( dl, bb.Min, bb.Max, IM_COL32( 38, 38, 38, 255 ), IM_COL32( 28, 28, 28, 255 ) );
-		else          frame( dl, bb.Min, bb.Max, hovered ? IM_COL32( 32, 32, 32, 255 ) : IM_COL32( 28, 28, 28, 255 ), IM_COL32( 20, 20, 20, 255 ) );
-
-		const ImVec2 ls = text_size( label );
-		text( dl, ImVec2( bb.GetCenter( ).x - ls.x * 0.5f, text_y( bb.Min.y, size.y ) ),
-			active ? accent( ) : ( hovered ? col::text : col::dim ), label );
-		return pressed;
-	}
-
-	void apply_style( ) {
-		ImGuiStyle& s = ImGui::GetStyle( );
-		s.WindowRounding    = 0.0f;
-		s.ChildRounding     = 0.0f;
-		s.FrameRounding     = 0.0f;
-		s.PopupRounding     = 0.0f;
-		s.GrabRounding      = 0.0f;
-		s.ScrollbarRounding = 0.0f;
-		s.WindowPadding     = ImVec2( 0, 0 );
-		s.WindowBorderSize  = 0.0f;
-		s.ChildBorderSize   = 0.0f;
-		s.PopupBorderSize   = 1.0f;
-		s.FrameBorderSize   = 1.0f;
-
-		ImVec4* c = s.Colors;
-		c[ ImGuiCol_Text ]           = ImColor( col::text );
-		c[ ImGuiCol_WindowBg ]       = ImColor( col::window );
-		c[ ImGuiCol_ChildBg ]        = ImVec4( 0, 0, 0, 0 );
-		c[ ImGuiCol_PopupBg ]        = ImColor( col::group );
-		c[ ImGuiCol_Border ]         = ImColor( col::black );
-		c[ ImGuiCol_FrameBg ]        = ImColor( col::ctrl_bot );
-		c[ ImGuiCol_FrameBgHovered ] = ImColor( col::ctrl_top );
-		c[ ImGuiCol_FrameBgActive ]  = ImColor( col::ctrl_hover );
-		c[ ImGuiCol_NavCursor ]      = ImVec4( 0, 0, 0, 0 );
-	}
-
+	ImGui::PopID();
+	ImGui::Dummy(ImVec2(0.0f, 4.0f));
+	return changed;
 }
 
-void menu::setup( ) {
-	ImGuiIO& io = ImGui::GetIO( );
-	font = io.Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\verdana.ttf", font_size );
-	if ( !font )
-		font = io.Fonts->AddFontDefault( );
-	apply_style( );
+bool TopTab(
+	const char* label,
+	int index
+) {
+	const bool selected =
+		active_tab == index;
+
+	if (selected) {
+		ImGui::PushStyleColor(
+			ImGuiCol_Button,
+			ImGui::ColorConvertU32ToFloat4(
+				Accent(0.88f)
+			)
+		);
+		ImGui::PushStyleColor(
+			ImGuiCol_ButtonHovered,
+			ImGui::ColorConvertU32ToFloat4(
+				Accent()
+			)
+		);
+	} else {
+		ImGui::PushStyleColor(
+			ImGuiCol_Button,
+			ImVec4(0, 0, 0, 0)
+		);
+		ImGui::PushStyleColor(
+			ImGuiCol_ButtonHovered,
+			ImGui::ColorConvertU32ToFloat4(
+				palette::panel_alt
+			)
+		);
+	}
+
+	ImGui::PushStyleColor(
+		ImGuiCol_ButtonActive,
+		ImGui::ColorConvertU32ToFloat4(
+			Accent(0.72f)
+		)
+	);
+
+	const bool pressed =
+		ImGui::Button(
+			label,
+			ImVec2(112.0f, 34.0f)
+		);
+
+	ImGui::PopStyleColor(3);
+
+	if (pressed) {
+		active_tab = index;
+	}
+
+	return pressed;
 }
 
-void menu::render( const RuntimeStatus& status ) {
-	const ImVec2 size( 560.0f, 380.0f );
+void RenderDisplayPage(
+	const ImVec2& available
+) {
+	static const char* boxStyles[] = {
+		"Full",
+		"Corner"
+	};
+	static const char* origins[] = {
+		"Bottom",
+		"Center",
+		"Top"
+	};
 
-	ImGui::SetNextWindowPos( ImVec2( 60.0f, 60.0f ), ImGuiCond_FirstUseEver );
-	ImGui::SetNextWindowSize( size );
-	ImGui::PushFont( font, font_size );
-	ImGui::Begin( "##nexus", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar |
-		ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse );
-	{
-		ImDrawList*  dl = ImGui::GetWindowDrawList( );
-		const ImVec2 wp = ImGui::GetWindowPos( );
+	const float gap = 14.0f;
+	const float column =
+		(available.x - gap) * 0.5f;
 
-		ImGui::PushClipRect( wp, wp + size, false );
-		dl->AddRect( wp, wp + size, col::black );
-		dl->AddRect( wp + ImVec2( 1, 1 ), wp + size - ImVec2( 1, 1 ), col::edge );
+	BeginCard(
+		"##display_primary",
+		ImVec2(column, available.y)
+	);
+	CardHeader(
+		"Display",
+		"Customize the existing overlay presentation."
+	);
 
-		static const char* months[ ] = { "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec" };
-		SYSTEMTIME st {};
-		GetLocalTime( &st );
-		char date[ 32 ];
-		std::snprintf( date, sizeof( date ), " | %s %d %d", months[ ( st.wMonth - 1 ) % 12 ], st.wDay, st.wYear );
+	SettingToggle(
+		"Bounding Box",
+		&cfg.box,
+		cfg.box_color
+	);
+	ComboRow(
+		"Box Style",
+		&cfg.box_style,
+		boxStyles,
+		IM_ARRAYSIZE(boxStyles)
+	);
+	SettingToggle(
+		"Box Fill",
+		&cfg.box_fill
+	);
+	SettingToggle(
+		"Skeleton",
+		&cfg.skeleton,
+		cfg.skeleton_color
+	);
+	SettingToggle(
+		"Distance",
+		&cfg.distance
+	);
+	EndCard();
 
-		const ImVec2 ms = text_size( "Nexus" );
-		text( dl, wp + ImVec2( 9, 6 ), accent( ), "Nexus" );
-		text( dl, wp + ImVec2( 9 + ms.x, 6 ), col::dim, date );
+	ImGui::SameLine(0.0f, gap);
 
-		dl->AddRectFilledMultiColor( wp + ImVec2( 2, 24 ), wp + ImVec2( size.x - 2, 26 ), accent( ), accent( 0.45f ), accent( 0.45f ), accent( ) );
-		ImGui::PopClipRect( );
+	BeginCard(
+		"##display_secondary",
+		ImVec2(
+			available.x - column - gap,
+			available.y
+		)
+	);
+	CardHeader(
+		"Lines",
+		"Configure the existing line presentation."
+	);
 
-		static const char* tabs[ ] = { "visuals", "config" };
-		const float tabs_x = 10.0f, tabs_y = 36.0f, tab_h = 24.0f;
-		const float tab_w = ImFloor( ( size.x - tabs_x * 2.0f - ( IM_ARRAYSIZE( tabs ) - 1 ) * 3.0f ) / IM_ARRAYSIZE( tabs ) );
-		ImGui::SetCursorPos( ImVec2( tabs_x, tabs_y ) );
-		for ( int i = 0; i < IM_ARRAYSIZE( tabs ); ++i ) {
-			if ( i ) ImGui::SameLine( 0, 3.0f );
-			if ( tab_button( tabs[ i ], tab == i, ImVec2( tab_w, tab_h ) ) )
-				tab = i;
-		}
+	SettingToggle(
+		"Snaplines",
+		&cfg.snaplines,
+		cfg.snapline_color
+	);
+	ComboRow(
+		"Origin",
+		&cfg.snapline_origin,
+		origins,
+		IM_ARRAYSIZE(origins)
+	);
 
-		const float content_y = tabs_y + tab_h + 10.0f;
-		const ImVec2 avail( size.x - tabs_x * 2.0f, size.y - content_y - 10.0f );
-		ImGui::SetCursorPos( ImVec2( tabs_x, content_y ) );
-		ImGui::BeginGroup( );
-		if ( tab == 0 ) page_visuals( avail );
-		else            page_config ( avail, status );
-		ImGui::EndGroup( );
+	ImGui::Dummy(ImVec2(0.0f, 10.0f));
+	ImGui::Separator();
+	ImGui::Dummy(ImVec2(0.0f, 8.0f));
+
+	ImGui::TextDisabled(
+		"Changes are applied immediately."
+	);
+	EndCard();
+}
+
+void RenderSettingsPage(
+	const ImVec2& available,
+	const menu::RuntimeStatus& status
+) {
+	const float gap = 14.0f;
+	const float column =
+		(available.x - gap) * 0.5f;
+
+	BeginCard(
+		"##settings_primary",
+		ImVec2(column, available.y)
+	);
+	CardHeader(
+		"Interface",
+		"Local Nexus interface preferences."
+	);
+
+	KeybindRow(
+		"Menu Key",
+		&cfg.menu_key
+	);
+
+	ImGui::AlignTextToFramePadding();
+	ImGui::TextUnformatted("Accent");
+	ImGui::SameLine();
+	ImGui::SetCursorPosX(
+		ImGui::GetWindowContentRegionMax().x -
+		160.0f
+	);
+	ImGui::SetNextItemWidth(160.0f);
+	ImGui::ColorEdit4(
+		"##accent",
+		cfg.accent,
+		ImGuiColorEditFlags_NoInputs |
+		ImGuiColorEditFlags_AlphaPreviewHalf
+	);
+
+	ImGui::Dummy(ImVec2(0.0f, 16.0f));
+	ImGui::Separator();
+	ImGui::Dummy(ImVec2(0.0f, 12.0f));
+
+	if (ImGui::Button(
+		"SAVE",
+		ImVec2(-1.0f, 36.0f)
+	)) {
+		(void)app_settings::Save(cfg);
 	}
-	ImGui::End( );
-	ImGui::PopFont( );
+
+	if (ImGui::Button(
+		"LOAD",
+		ImVec2(-1.0f, 36.0f)
+	)) {
+		(void)app_settings::Load(cfg);
+	}
+
+	ImGui::PushStyleColor(
+		ImGuiCol_Button,
+		ImVec4(0.15f, 0.16f, 0.22f, 1.0f)
+	);
+	if (ImGui::Button(
+		"RESET TO DEFAULTS",
+		ImVec2(-1.0f, 36.0f)
+	)) {
+		cfg = cfg_default;
+	}
+	ImGui::PopStyleColor();
+
+	EndCard();
+
+	ImGui::SameLine(0.0f, gap);
+
+	BeginCard(
+		"##settings_status",
+		ImVec2(
+			available.x - column - gap,
+			available.y
+		)
+	);
+	CardHeader(
+		"Runtime",
+		"Live renderer and data diagnostics."
+	);
+
+	StatusLine(
+		"Build",
+		"1.0.5"
+	);
+	StatusLine(
+		"Game",
+		"Fortnite"
+	);
+	StatusLine(
+		"World",
+		status.world_valid ? "Ready" : "Unavailable",
+		status.world_valid
+			? palette::success
+			: palette::warning
+	);
+	StatusLine(
+		"Camera",
+		status.camera_valid ? "Ready" : "Unavailable",
+		status.camera_valid
+			? palette::success
+			: palette::warning
+	);
+
+	char buffer[64]{};
+
+	std::snprintf(
+		buffer,
+		sizeof(buffer),
+		"%d",
+		status.actor_count
+	);
+	StatusLine("Actors", buffer);
+
+	std::snprintf(
+		buffer,
+		sizeof(buffer),
+		"%d",
+		status.player_count
+	);
+	StatusLine("Players", buffer);
+
+	std::snprintf(
+		buffer,
+		sizeof(buffer),
+		"%.0f FPS",
+		status.fps
+	);
+	StatusLine(
+		"Renderer",
+		buffer,
+		status.fps >= 55.0f
+			? palette::success
+			: palette::warning
+	);
+
+	std::snprintf(
+		buffer,
+		sizeof(buffer),
+		"%.2f ms",
+		status.frame_ms
+	);
+	StatusLine("Frame Time", buffer);
+
+	std::snprintf(
+		buffer,
+		sizeof(buffer),
+		"%.3f ms",
+		status.engine_ms
+	);
+	StatusLine("Engine", buffer);
+
+	std::snprintf(
+		buffer,
+		sizeof(buffer),
+		"%.3f ms",
+		status.actors_ms
+	);
+	StatusLine("Actor Scan", buffer);
+
+	std::snprintf(
+		buffer,
+		sizeof(buffer),
+		"%.3f ms",
+		status.players_ms
+	);
+	StatusLine("Player Cache", buffer);
+
+	std::snprintf(
+		buffer,
+		sizeof(buffer),
+		"%.2fx",
+		status.dpi_scale
+	);
+	StatusLine("DPI Scale", buffer);
+
+	EndCard();
+}
+
+void ApplyStyle() {
+	ImGuiStyle& style = ImGui::GetStyle();
+
+	style.WindowRounding = 12.0f;
+	style.ChildRounding = 10.0f;
+	style.FrameRounding = 8.0f;
+	style.PopupRounding = 10.0f;
+	style.GrabRounding = 8.0f;
+	style.ScrollbarRounding = 8.0f;
+
+	style.WindowPadding = ImVec2(18.0f, 16.0f);
+	style.FramePadding = ImVec2(11.0f, 8.0f);
+	style.ItemSpacing = ImVec2(10.0f, 10.0f);
+	style.ItemInnerSpacing = ImVec2(8.0f, 6.0f);
+
+	style.WindowBorderSize = 1.0f;
+	style.ChildBorderSize = 1.0f;
+	style.PopupBorderSize = 1.0f;
+	style.FrameBorderSize = 1.0f;
+
+	ImVec4* colors = style.Colors;
+
+	colors[ImGuiCol_Text] =
+		ImGui::ColorConvertU32ToFloat4(
+			palette::text
+		);
+	colors[ImGuiCol_TextDisabled] =
+		ImGui::ColorConvertU32ToFloat4(
+			palette::muted
+		);
+	colors[ImGuiCol_WindowBg] =
+		ImGui::ColorConvertU32ToFloat4(
+			palette::background
+		);
+	colors[ImGuiCol_ChildBg] =
+		ImGui::ColorConvertU32ToFloat4(
+			palette::panel
+		);
+	colors[ImGuiCol_PopupBg] =
+		ImGui::ColorConvertU32ToFloat4(
+			palette::panel_alt
+		);
+	colors[ImGuiCol_Border] =
+		ImGui::ColorConvertU32ToFloat4(
+			palette::border
+		);
+	colors[ImGuiCol_FrameBg] =
+		ImVec4(0.075f, 0.088f, 0.145f, 1.0f);
+	colors[ImGuiCol_FrameBgHovered] =
+		ImVec4(0.11f, 0.12f, 0.20f, 1.0f);
+	colors[ImGuiCol_FrameBgActive] =
+		ImVec4(0.13f, 0.14f, 0.24f, 1.0f);
+	colors[ImGuiCol_Button] =
+		ImVec4(0.42f, 0.12f, 0.86f, 1.0f);
+	colors[ImGuiCol_ButtonHovered] =
+		ImVec4(0.56f, 0.22f, 1.0f, 1.0f);
+	colors[ImGuiCol_ButtonActive] =
+		ImVec4(0.34f, 0.09f, 0.72f, 1.0f);
+	colors[ImGuiCol_CheckMark] =
+		ImVec4(0.72f, 0.36f, 1.0f, 1.0f);
+	colors[ImGuiCol_SliderGrab] =
+		ImVec4(0.58f, 0.27f, 1.0f, 1.0f);
+	colors[ImGuiCol_SliderGrabActive] =
+		ImVec4(0.72f, 0.40f, 1.0f, 1.0f);
+	colors[ImGuiCol_Header] =
+		ImVec4(0.35f, 0.16f, 0.62f, 0.75f);
+	colors[ImGuiCol_HeaderHovered] =
+		ImVec4(0.48f, 0.20f, 0.82f, 0.88f);
+	colors[ImGuiCol_HeaderActive] =
+		ImVec4(0.42f, 0.16f, 0.74f, 1.0f);
+}
+
+} // namespace
+
+void menu::setup() {
+	ImGuiIO& io = ImGui::GetIO();
+
+	font_regular = io.Fonts->AddFontFromFileTTF(
+		"C:\\Windows\\Fonts\\segoeui.ttf",
+		14.5f,
+		nullptr,
+		io.Fonts->GetGlyphRangesDefault()
+	);
+	if (!font_regular) {
+		font_regular =
+			io.Fonts->AddFontDefault();
+	}
+
+	font_title = io.Fonts->AddFontFromFileTTF(
+		"C:\\Windows\\Fonts\\seguisb.ttf",
+		18.0f,
+		nullptr,
+		io.Fonts->GetGlyphRangesDefault()
+	);
+	if (!font_title) {
+		font_title = font_regular;
+	}
+
+	io.FontDefault = font_regular;
+	ApplyStyle();
+}
+
+void menu::render(
+	const RuntimeStatus& status
+) {
+	const ImVec2 size(680.0f, 500.0f);
+
+	ImGui::SetNextWindowPos(
+		ImVec2(60.0f, 60.0f),
+		ImGuiCond_FirstUseEver
+	);
+	ImGui::SetNextWindowSize(size);
+
+	ImGui::Begin(
+		"##nexus_overlay_menu",
+		nullptr,
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoScrollbar |
+		ImGuiWindowFlags_NoScrollWithMouse |
+		ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_NoCollapse
+	);
+
+	ImDrawList* draw =
+		ImGui::GetWindowDrawList();
+	const ImVec2 windowPos =
+		ImGui::GetWindowPos();
+	const ImVec2 windowSize =
+		ImGui::GetWindowSize();
+
+	draw->AddRect(
+		windowPos,
+		windowPos + windowSize,
+		palette::border,
+		12.0f,
+		0,
+		1.0f
+	);
+
+	draw->AddRectFilledMultiColor(
+		ImVec2(
+			windowPos.x + 1.0f,
+			windowPos.y + 1.0f
+		),
+		ImVec2(
+			windowPos.x + windowSize.x - 1.0f,
+			windowPos.y + 5.0f
+		),
+		Accent(),
+		Accent(0.85f),
+		Accent(0.35f),
+		Accent(0.65f)
+	);
+
+	ImGui::SetCursorPos(
+		ImVec2(18.0f, 18.0f)
+	);
+	DrawBrand();
+
+	ImGui::SameLine();
+	ImGui::SetCursorPosY(23.0f);
+	ImGui::TextDisabled(
+		"Premium Interface"
+	);
+
+	ImGui::SameLine();
+	const char* build = "BUILD 1.0.5";
+	const ImVec2 buildSize =
+		ImGui::CalcTextSize(build);
+	ImGui::SetCursorPosX(
+		windowSize.x -
+		buildSize.x -
+		20.0f
+	);
+	ImGui::TextDisabled("%s", build);
+
+	ImGui::SetCursorPos(
+		ImVec2(18.0f, 62.0f)
+	);
+
+	TopTab("Display", 0);
+	ImGui::SameLine(0.0f, 8.0f);
+	TopTab("Settings", 1);
+
+	ImGui::SetCursorPos(
+		ImVec2(18.0f, 110.0f)
+	);
+
+	const ImVec2 available(
+		windowSize.x - 36.0f,
+		windowSize.y - 128.0f
+	);
+
+	if (active_tab == 0) {
+		RenderDisplayPage(available);
+	} else {
+		RenderSettingsPage(
+			available,
+			status
+		);
+	}
+
+	ImGui::End();
 }
