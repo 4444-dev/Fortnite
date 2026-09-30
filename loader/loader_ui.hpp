@@ -23,22 +23,31 @@ public:
 	UiController& operator=(UiController&&) = delete;
 
 	void Tick();
-	void Draw(bool& requestClose);
+	void Draw(bool& requestClose, bool& requestMinimize);
 
 private:
-	enum class Screen {
-		ProductSelect,
-		Authentication
+	enum class Page {
+		Home,
+		Products,
+		Settings,
+		About
 	};
 
 	using LicenseBuffer =
 		std::array<char, license_store::kMaxLicenseLength + 1>;
 
+	void EnsureSelection();
+	void SelectProduct(const ProductDefinition& product);
 	void LoadRememberedLicense(const ProductDefinition& product);
-	void DrawProductSelection();
-	void DrawAuthentication(bool& requestClose);
 
-	Screen m_Screen = Screen::ProductSelect;
+	void DrawSidebar();
+	void DrawHeader(bool& requestClose, bool& requestMinimize);
+	void DrawHome(bool& requestClose);
+	void DrawProducts();
+	void DrawSettings();
+	void DrawAbout();
+
+	Page m_Page = Page::Home;
 	const ProductDefinition* m_SelectedProduct = nullptr;
 	std::unique_ptr<AuthController> m_Auth;
 	LicenseBuffer m_License{};
