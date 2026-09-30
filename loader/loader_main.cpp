@@ -75,18 +75,10 @@ int WINAPI wWinMain(
 		);
 	}
 
-	if (runtimeFailure) {
-		MessageBoxW(
-			window.Handle(),
-			L"The loader renderer stopped unexpectedly. Restart the loader and check your graphics environment.",
-			L"luvkrimes loader",
-			MB_OK | MB_ICONERROR
-		);
-	}
 
 	window.AttachRenderer(nullptr);
 	renderer.Shutdown();
 	window.Destroy();
 
-	return runtimeFailure ? 1 : 0;
+	return rendererFailed ? 1 : 0;
 }
