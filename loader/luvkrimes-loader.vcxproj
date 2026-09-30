@@ -50,7 +50,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>_DEBUG;SODIUM_STATIC;WIN32_LEAN_AND_MEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ProjectDir)..\thirdparty\keyauth;$(ProjectDir)..\thirdparty\keyauth\curl;$(ProjectDir)..\thirdparty\keyauth\libsodium;$(ProjectDir);$(ProjectDir)..\luvkrimes base;$(ProjectDir)..\luvkrimes base\thirdparty\imgui;$(ProjectDir)..\luvkrimes base\thirdparty\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -61,6 +61,7 @@
       <AdditionalLibraryDirectories>$(ProjectDir)..\thirdparty\keyauth\curl;$(ProjectDir)..\thirdparty\keyauth\libsodium;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>d3d11.lib;dxgi.lib;Crypt32.lib;libsodium.lib;libcurl.lib;zlib.lib;winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4099 %(AdditionalOptions)</AdditionalOptions>
+      <IgnoreSpecificDefaultLibraries>LIBCMT.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
       <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)..\scripts\bootstrap-keyauth.ps1"</Command>
