@@ -13,7 +13,6 @@
 namespace loader::license_store {
 namespace {
 
-constexpr std::size_t kMaxLicenseLength = 4096;
 
 bool ValidSlug(std::string_view slug) {
 	if (slug.empty() || slug.size() > 64) {
