@@ -37,17 +37,18 @@ bool RunProductRegistryTests() {
 	ok &= Check(loader::RegistryIsValid(), "product registry invariants");
 	const auto* fortnite = loader::FindProduct(loader::ProductId::Fortnite);
 	const auto* apex = loader::FindProduct(loader::ProductId::ApexLegends);
-	ok &= Check(fortnite && fortnite->Id == loader::ProductId::Fortnite &&
-		fortnite->Slug == loader::Fortnite.Slug && fortnite->Configured == loader::Fortnite.Configured,
-		"find Fortnite product");
-	ok &= Check(apex && apex->Id == loader::ProductId::ApexLegends &&
-		apex->Slug == loader::ApexLegends.Slug && apex->Configured == loader::ApexLegends.Configured,
-		"find Apex product");
+	ok &= Check(fortnite == &loader::Fortnite, "find Fortnite product");
+	ok &= Check(apex == &loader::ApexLegends, "find Apex product");
 	ok &= Check(loader::Fortnite.Configured, "Fortnite configured");
 	ok &= Check(!loader::ApexLegends.Configured, "Apex remains disabled until configured");
 	ok &= Check(loader::Fortnite.Slug != loader::ApexLegends.Slug, "product slugs isolated");
 	ok &= Check(loader::Fortnite.TargetEnvironmentVariable != loader::ApexLegends.TargetEnvironmentVariable,
 		"product launch targets isolated");
+	ok &= Check(loader::IsValidProductSlug("fortnite"), "accept valid product slug");
+	ok &= Check(loader::IsValidProductSlug("apex_2-test"), "accept slug separators");
+	ok &= Check(!loader::IsValidProductSlug(""), "reject empty product slug");
+	ok &= Check(!loader::IsValidProductSlug("Fortnite"), "reject uppercase product slug");
+	ok &= Check(!loader::IsValidProductSlug("../fortnite"), "reject path-like product slug");
 	return ok;
 }
 
