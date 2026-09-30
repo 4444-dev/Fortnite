@@ -274,9 +274,27 @@ bool RunLicenseStoreTests() {
 		"maximum-length remembered license roundtrip"
 	);
 
+	std::filesystem::path staleTemporary =
+		localAppData.LicensePath(slug);
+	staleTemporary += L".tmp";
+
+	{
+		std::ofstream stale(
+			staleTemporary,
+			std::ios::binary | std::ios::trunc
+		);
+		stale << "stale";
+	}
+
 	loader::license_store::Clear(slug);
 	loader::license_store::Clear(otherSlug);
 	loaded = "sentinel";
+
+	ok &= Check(
+		!std::filesystem::exists(localAppData.LicensePath(slug)) &&
+			!std::filesystem::exists(staleTemporary),
+		"clear remembered license artifacts"
+	);
 
 	ok &= Check(
 		!loader::license_store::Load(slug, loaded) &&
