@@ -9,6 +9,7 @@ using u8 = uint8_t;
 using i32 = int32_t;
 #include <workspace/game/unreal/structures.hpp>
 #include "../loader/launch_target.hpp"
+#include "../loader/license_store.hpp"
 #include "../loader/product_registry.hpp"
 
 #include <cmath>
@@ -49,6 +50,50 @@ bool RunProductRegistryTests() {
 	ok &= Check(!loader::IsValidProductSlug(""), "reject empty product slug");
 	ok &= Check(!loader::IsValidProductSlug("Fortnite"), "reject uppercase product slug");
 	ok &= Check(!loader::IsValidProductSlug("../fortnite"), "reject path-like product slug");
+	return ok;
+}
+
+bool RunLicenseStoreTests() {
+	bool ok = true;
+	constexpr std::string_view slug = "luvkrimes-ci-test";
+	const std::string value = "test-license-value";
+
+	loader::license_store::Clear(slug);
+
+	ok &= Check(
+		!loader::license_store::Save("../invalid", value),
+		"reject unsafe license-store slug"
+	);
+	ok &= Check(
+		!loader::license_store::Save(slug, ""),
+		"reject empty remembered license"
+	);
+	ok &= Check(
+		!loader::license_store::Save(
+			slug,
+			std::string(loader::license_store::kMaxLicenseLength + 1, 'x')
+		),
+		"reject oversized remembered license"
+	);
+
+	ok &= Check(
+		loader::license_store::Save(slug, value),
+		"save remembered license"
+	);
+
+	std::string loaded;
+	ok &= Check(
+		loader::license_store::Load(slug, loaded) && loaded == value,
+		"remembered license roundtrip"
+	);
+
+	loader::license_store::Clear(slug);
+	loaded = "sentinel";
+	ok &= Check(
+		!loader::license_store::Load(slug, loaded) && loaded.empty(),
+		"clear remembered license"
+	);
+
 	return ok;
 }
 
@@ -136,6 +181,7 @@ bool RunMathTests() {
 
 int main() {
 	if (!RunProductRegistryTests()) return 1;
+	if (!RunLicenseStoreTests()) return 1;
 	if (!RunLaunchContractTests()) return 1;
 	if (!RunMathTests()) return 1;
 
