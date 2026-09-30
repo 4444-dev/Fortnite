@@ -17,49 +17,72 @@ namespace {
 		bool  valid { false };
 	};
 
-	BBox GetDynamicBBoxFromBones(
-		const FVector2D* pts,
-		int              count,
-		float extra_head_ratio = 0.15f,
-		float extra_feet_ratio = 0.03f,
-		float side_pad_ratio   = 0.035f
+	BBox GetBodyBBox(
+		const FVector2D& head,
+		const FVector2D& pelvis,
+		const FVector2D& leftFoot,
+		const FVector2D& rightFoot
 	) {
 		BBox box {};
 
-		bool  any = false;
-		float minX = 0.f, minY = 0.f, maxX = 0.f, maxY = 0.f;
-		for ( int i = 0; i < count; ++i ) {
-			const float px = static_cast< float >( pts [ i ].X );
-			const float py = static_cast< float >( pts [ i ].Y );
-			if ( !any ) {
-				minX = maxX = px;
-				minY = maxY = py;
-				any = true;
-			} else {
-				if ( px < minX ) minX = px;
-				if ( px > maxX ) maxX = px;
-				if ( py < minY ) minY = py;
-				if ( py > maxY ) maxY = py;
-			}
-		}
-		if ( !any )
+		const float headX = static_cast<float>( head.X );
+		const float headY = static_cast<float>( head.Y );
+		const float pelvisX = static_cast<float>( pelvis.X );
+		const float leftFootX = static_cast<float>( leftFoot.X );
+		const float leftFootY = static_cast<float>( leftFoot.Y );
+		const float rightFootX = static_cast<float>( rightFoot.X );
+		const float rightFootY = static_cast<float>( rightFoot.Y );
+
+		const float feetY = leftFootY > rightFootY ? leftFootY : rightFootY;
+		const float bodyHeight = feetY - headY;
+		if ( !std::isfinite( bodyHeight ) || bodyHeight < 8.0f )
 			return box;
 
-		const float baseHeight = maxY - minY;
-		const float baseWidth  = maxX - minX;
-		if ( baseHeight <= 0.f || baseWidth <= 0.f )
-			return box;
+		// Use the torso/feet axis instead of arm/hand extrema. This keeps
+		// the box stable when a character stretches an arm toward the camera.
+		const float centerX =
+			( headX * 0.20f ) +
+			( pelvisX * 0.55f ) +
+			( ( leftFootX + rightFootX ) * 0.5f * 0.25f );
 
-		const float head_pad = baseHeight * extra_head_ratio;
-		const float feet_pad = baseHeight * extra_feet_ratio;
-		const float side_pad = baseWidth  * side_pad_ratio;
+		const float width = bodyHeight * 0.46f;
+		const float topPad = bodyHeight * 0.08f;
+		const float bottomPad = bodyHeight * 0.03f;
 
-		box.x = minX - side_pad;
-		box.y = minY - head_pad;
-		box.w = ( maxX + side_pad ) - box.x;
-		box.h = ( maxY + feet_pad ) - box.y;
-		box.valid = ( box.w > 0.f && box.h > 0.f );
+		box.x = centerX - width * 0.5f;
+		box.y = headY - topPad;
+		box.w = width;
+		box.h = bodyHeight + topPad + bottomPad;
+		box.valid =
+			std::isfinite( box.x ) &&
+			std::isfinite( box.y ) &&
+			std::isfinite( box.w ) &&
+			std::isfinite( box.h ) &&
+			box.w > 2.0f &&
+			box.h > 8.0f;
 		return box;
+	}
+
+	bool SegmentLooksSane(
+		const FVector& worldA,
+		const FVector& worldB,
+		const FVector2D& screenA,
+		const FVector2D& screenB,
+		float boxHeight
+	) {
+		const double worldLength = ( worldA - worldB ).Size( );
+		if ( !std::isfinite( worldLength ) || worldLength <= 0.1 || worldLength > 95.0 )
+			return false;
+
+		const double dx = screenA.X - screenB.X;
+		const double dy = screenA.Y - screenB.Y;
+		const double screenLength = std::sqrt( dx * dx + dy * dy );
+		if ( !std::isfinite( screenLength ) )
+			return false;
+
+		// Individual human body segments should never span most of the
+		// full body box. Reject projection glitches before drawing.
+		return screenLength <= static_cast<double>( boxHeight ) * 0.62;
 	}
 
 	void DrawBox( ImDrawList* draw, float x, float y, float w, float h,
@@ -183,8 +206,6 @@ namespace player {
 			bool sane = false;
 			FVector2D screen_bones [ 16 ] {};
 			bool      bone_valid  [ 16 ] {};
-			FVector2D packed      [ 16 ] {};
-			int projected = 0;
 
 			if ( Player.BonesValid ) {
 				sane = true;
@@ -205,7 +226,6 @@ namespace player {
 						if ( Camera.WorldToScreen( Player.Bones [ i ], Width, Height, s ) ) {
 							screen_bones [ i ] = s;
 							bone_valid   [ i ] = true;
-							packed [ projected++ ] = s;
 						}
 					}
 				} else {
@@ -214,9 +234,23 @@ namespace player {
 			}
 
 			BBox bbox {};
-			const bool hasBoneBox = sane && projected >= 4;
-			if ( hasBoneBox )
-				bbox = GetDynamicBBoxFromBones( packed, projected );
+			const bool hasCoreBones =
+				sane &&
+				bone_valid [ 0 ] &&  // head
+				bone_valid [ 3 ] &&  // pelvis
+				bone_valid [ 12 ] && // left foot
+				bone_valid [ 15 ];   // right foot
+
+			if ( hasCoreBones ) {
+				bbox = GetBodyBBox(
+					screen_bones [ 0 ],
+					screen_bones [ 3 ],
+					screen_bones [ 12 ],
+					screen_bones [ 15 ]
+				);
+			}
+
+			const bool hasBoneBox = bbox.valid;
 
 			// Lobby fallback: when skeletal data is not ready, build a simple box from actor location.
 			if ( !bbox.valid ) {
@@ -270,6 +304,13 @@ namespace player {
 					const int a = pair [ 0 ];
 					const int b = pair [ 1 ];
 					if ( !bone_valid [ a ] || !bone_valid [ b ] )
+						continue;
+					if ( !SegmentLooksSane(
+						Player.Bones [ a ],
+						Player.Bones [ b ],
+						screen_bones [ a ],
+						screen_bones [ b ],
+						bbox.h ) )
 						continue;
 					const ImVec2 pa( static_cast< float >( screen_bones [ a ].X ),
 					                 static_cast< float >( screen_bones [ a ].Y ) );

@@ -384,6 +384,11 @@ struct FBoxSphereBounds {
 
 static_assert( sizeof( FBoxSphereBounds ) == 0x38, "FBoxSphereBounds must be 56 bytes" );
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4201)
+#endif
+
 struct FMatrix {
 	union {
 		struct {
@@ -479,6 +484,10 @@ struct FMatrix {
 };
 
 static_assert( sizeof( FMatrix ) == 0x80, "FMatrix must be 128 bytes" );
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 struct alignas( 16 ) FTransform {
 	FQuat Rotation;

@@ -1,94 +1,136 @@
 #include <includes.hpp>
 #include <workspace/util/logger/logger.hpp>
+#include <workspace/util/crash/crash_handler.hpp>
 
 #include <chrono>
 #include <thread>
 
-static PlayerCache g_Players;
-static CameraCache g_Camera;
-
 namespace {
 
-	u32 FindPidByName( const wchar_t* Name ) {
-		HANDLE snap = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 );
-		if ( snap == INVALID_HANDLE_VALUE )
-			return 0;
+class ScopedHandle final {
+public:
+	explicit ScopedHandle(HANDLE handle = nullptr) noexcept
+		: m_Handle(handle) {
+	}
 
-		PROCESSENTRY32W e {};
-		e.dwSize = sizeof( e );
+	~ScopedHandle() {
+		Reset();
+	}
 
-		u32 pid = 0;
-		if ( Process32FirstW( snap, &e ) ) {
-			do {
-				if ( _wcsicmp( e.szExeFile, Name ) == 0 ) {
-					pid = e.th32ProcessID;
-					break;
-				}
-			} while ( Process32NextW( snap, &e ) );
+	ScopedHandle(const ScopedHandle&) = delete;
+	ScopedHandle& operator=(const ScopedHandle&) = delete;
+
+	[[nodiscard]] HANDLE Get() const noexcept {
+		return m_Handle;
+	}
+
+	[[nodiscard]] bool IsValid() const noexcept {
+		return m_Handle && m_Handle != INVALID_HANDLE_VALUE;
+	}
+
+	void Reset(HANDLE handle = nullptr) noexcept {
+		if (IsValid()) {
+			CloseHandle(m_Handle);
 		}
-
-		CloseHandle( snap );
-		return pid;
+		m_Handle = handle;
 	}
 
-	u32 WaitForProcess( const wchar_t* Name, const char* PrettyName ) {
-		if ( const auto pid = FindPidByName( Name ) ) {
-			logger::Log( "%s already running (pid %u)", PrettyName, pid );
-			return pid;
+private:
+	HANDLE m_Handle = nullptr;
+};
+
+u32 FindPidByName(const wchar_t* name) {
+	if (!name || !*name) {
+		return 0;
+	}
+
+	ScopedHandle snapshot(CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0));
+	if (!snapshot.IsValid()) {
+		return 0;
+	}
+
+	PROCESSENTRY32W entry{};
+	entry.dwSize = sizeof(entry);
+
+	if (!Process32FirstW(snapshot.Get(), &entry)) {
+		return 0;
+	}
+
+	do {
+		if (_wcsicmp(entry.szExeFile, name) == 0) {
+			return entry.th32ProcessID;
 		}
+	} while (Process32NextW(snapshot.Get(), &entry));
 
-		logger::Log( "waiting for %s...", PrettyName );
-
-		u32 pid = 0;
-		while ( !( pid = FindPidByName( Name ) ) )
-			std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
-
-		logger::Log( "%s launched (pid %u)", PrettyName, pid );
-		return pid;
-	}
-
-	void PressKeyToExit( ) {
-		logger::Log( "press any key to exit..." );
-		( void ) getchar( );
-	}
-
+	return 0;
 }
 
-i32 main( i32, char** ) {
-	logger::Init( );
-	SetConsoleTitleW( L"luvkrimes base" );
+u32 WaitForProcess(const wchar_t* name, const char* prettyName) {
+	if (const u32 pid = FindPidByName(name)) {
+		logger::Log("%s already running (pid %u)", prettyName, pid);
+		return pid;
+	}
 
-	constexpr const wchar_t* ProcessName = L"FortniteClient-Win64-Shipping.exe";
+	logger::Log("waiting for %s...", prettyName);
 
-	WaitForProcess( ProcessName, "fortnite" );
+	u32 pid = 0;
+	while (!(pid = FindPidByName(name))) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	}
 
-	logger::Log( "attaching driver" );
+	logger::Log("%s launched (pid %u)", prettyName, pid);
+	return pid;
+}
 
-	uptr ImageBase = 0;
-	if ( !AttachDriver( ProcessName, &ImageBase ) ) {
-		logger::Log( "attach failed (win err %lu)", GetLastError( ) );
-		logger::Log( "check that the luvkrimes driver is loaded and mapped" );
-		PressKeyToExit( );
+void PressKeyToExit() {
+	logger::Log("press any key to exit...");
+	(void)getchar();
+}
+
+} // namespace
+
+i32 main(i32, char**) {
+	crash_handler::Install();
+	logger::Init();
+	SetConsoleTitleW(L"luvkrimes base");
+
+	constexpr const wchar_t* processName = L"FortniteClient-Win64-Shipping.exe";
+
+	WaitForProcess(processName, "fortnite");
+
+	logger::Log("attaching driver");
+
+	uptr imageBase = 0;
+	if (!AttachDriver(processName, &imageBase)) {
+		logger::Log("attach failed (win err %lu)", GetLastError());
+		logger::Log("check that the required device is available");
+		PressKeyToExit();
 		return 1;
 	}
 
-	logger::Log( "attached, image 0x%llx", static_cast< unsigned long long >( ImageBase ) );
+	logger::Log(
+		"attached, image 0x%llx",
+		static_cast<unsigned long long>(imageBase)
+	);
 
-	g_Players.SetImageBase( ImageBase );
-	g_Players.Start( );
-	logger::Log( "cache threads running" );
+	PlayerCache players;
+	CameraCache camera;
 
-	logger::Log( "starting overlay" );
-	const bool ok = overlay::run( g_Players, g_Camera );
+	players.SetImageBase(imageBase);
+	players.Start();
+	logger::Log("cache threads running");
 
-	g_Players.Stop( );
+	logger::Log("starting overlay");
+	const bool ok = overlay::run(players, camera);
 
-	if ( !ok ) {
-		logger::Log( "overlay exited with error" );
-		PressKeyToExit( );
+	players.Stop();
+
+	if (!ok) {
+		logger::Log("overlay exited with error");
+		PressKeyToExit();
 		return 1;
 	}
 
-	logger::Log( "clean exit" );
+	logger::Log("clean exit");
 	return 0;
 }

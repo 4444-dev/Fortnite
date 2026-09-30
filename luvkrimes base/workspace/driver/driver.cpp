@@ -3,6 +3,7 @@
 #include <includes.hpp>
 
 #include <Windows.h>
+#include <winioctl.h>
 #include <TlHelp32.h>
 #include <cstdint>
 #include "intrin.h"
@@ -226,7 +227,11 @@ namespace Driver {
 		mouse_request.x = x;
 		mouse_request.y = y;
 		mouse_request.button_flags = button_flags;
-		mouse_request.ExtraInformation = extraInfo;
+		// The request ABI stores only the low 32 bits in this ULONG field.
+#if defined(_MSC_VER)
+#pragma warning(suppress : 4244)
+#endif
+		mouse_request.ExtraInformation = static_cast<ULONG>( extraInfo );
 
 		IO_STATUS_BLOCK iosb{};
 		SendControl(MouseCallBack, &mouse_request);

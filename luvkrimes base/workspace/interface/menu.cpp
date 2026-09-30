@@ -1,6 +1,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 
 #include <workspace/interface/menu.hpp>
+#include <workspace/interface/settings_store.hpp>
 #include <thirdparty/imgui/imgui_internal.h>
 
 #include <Windows.h>
@@ -414,13 +415,17 @@ namespace {
 		end_group( );
 	}
 
-	void page_config( ImVec2 avail ) {
+	void page_config( ImVec2 avail, const menu::RuntimeStatus& status ) {
 		const float col_w = ImFloor( ( avail.x - 12.0f ) * 0.5f );
 
 		begin_group( "menu", ImVec2( col_w, avail.y ) );
 		keybind( "menu key", &cfg.menu_key );
 		checkbox( "accent color", nullptr, cfg.accent );
 		ImGui::Dummy( ImVec2( 0, 6 ) );
+		if ( button( "save settings" ) )
+			( void )app_settings::Save( cfg );
+		if ( button( "load settings" ) )
+			( void )app_settings::Load( cfg );
 		if ( button( "restore defaults" ) )
 			cfg = cfg_default;
 		end_group( );
@@ -430,6 +435,40 @@ namespace {
 		begin_group( "info", ImVec2( avail.x - col_w - 12.0f, avail.y ) );
 		info( "build", "1.0" );
 		info( "game", "fortnite" );
+		info( "world", status.world_valid ? "ok" : "invalid" );
+		info( "camera", status.camera_valid ? "ok" : "invalid" );
+
+		char actors[ 16 ] {};
+		std::snprintf( actors, sizeof( actors ), "%d", status.actor_count );
+		info( "actors", actors );
+
+		char players[ 16 ] {};
+		std::snprintf( players, sizeof( players ), "%d", status.player_count );
+		info( "players", players );
+
+		char fps[ 16 ] {};
+		std::snprintf( fps, sizeof( fps ), "%.0f", status.fps );
+		info( "fps", fps );
+
+		char frameMs[ 24 ] {};
+		std::snprintf( frameMs, sizeof( frameMs ), "%.2f ms", status.frame_ms );
+		info( "frame", frameMs );
+
+		char engineMs[ 24 ] {};
+		std::snprintf( engineMs, sizeof( engineMs ), "%.3f ms", status.engine_ms );
+		info( "engine", engineMs );
+
+		char actorsMs[ 24 ] {};
+		std::snprintf( actorsMs, sizeof( actorsMs ), "%.3f ms", status.actors_ms );
+		info( "actor scan", actorsMs );
+
+		char playersMs[ 24 ] {};
+		std::snprintf( playersMs, sizeof( playersMs ), "%.3f ms", status.players_ms );
+		info( "player cache", playersMs );
+
+		char dpiScale[ 24 ] {};
+		std::snprintf( dpiScale, sizeof( dpiScale ), "%.2fx", status.dpi_scale );
+		info( "dpi", dpiScale );
 		end_group( );
 	}
 
@@ -490,7 +529,7 @@ void menu::setup( ) {
 	apply_style( );
 }
 
-void menu::render( ) {
+void menu::render( const RuntimeStatus& status ) {
 	const ImVec2 size( 560.0f, 380.0f );
 
 	ImGui::SetNextWindowPos( ImVec2( 60.0f, 60.0f ), ImGuiCond_FirstUseEver );
@@ -534,7 +573,7 @@ void menu::render( ) {
 		ImGui::SetCursorPos( ImVec2( tabs_x, content_y ) );
 		ImGui::BeginGroup( );
 		if ( tab == 0 ) page_visuals( avail );
-		else            page_config ( avail );
+		else            page_config ( avail, status );
 		ImGui::EndGroup( );
 	}
 	ImGui::End( );
