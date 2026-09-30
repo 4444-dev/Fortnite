@@ -14,127 +14,11 @@ if ($Version.StartsWith("v", [System.StringComparison]::OrdinalIgnoreCase)) {
     $Version = $Version.Substring(1)
 }
 
-if ($Version -notmatch '^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)([-.][0-9A-Za-z.-]+)?
-
-if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
-    $OutputDirectory = Join-Path $root "dist"
-}
-
-$output = [System.IO.Path]::GetFullPath($OutputDirectory)
-$stage = Join-Path $output ("stage\Luvkrimes-" + $Version)
-
-$loaderSource = Join-Path $root "loader\bin\x64\$Configuration\luvkrimes-loader.exe"
-$fortniteSource = Join-Path $root "luvkrimes base\x64\$Configuration\luvkrimes base.exe"
-
-foreach ($required in @($loaderSource, $fortniteSource)) {
-    if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
-        throw "Required release binary is missing: $required"
-    }
-}
-
-if (Test-Path -LiteralPath $output) {
-    Remove-Item -LiteralPath $output -Recurse -Force
-}
-
-New-Item -ItemType Directory -Force -Path $stage | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $stage "projects\fortnite") | Out-Null
-
-Copy-Item -LiteralPath $loaderSource -Destination (Join-Path $stage "Luvkrimes.exe")
-Copy-Item -LiteralPath $fortniteSource -Destination (Join-Path $stage "projects\fortnite\Luvkrimes-Fortnite.exe")
-
-Set-Content -LiteralPath (Join-Path $stage "VERSION.txt") -Value $Version -Encoding utf8NoBOM
-
-$readme = @"
-Luvkrimes $Version
-
-1. Launch Luvkrimes.exe.
-2. Select the configured product.
-3. Authenticate with the license key supplied for that product.
-4. Use LAUNCH after authentication.
-
-The packaged Fortnite executable is stored under:
-projects\fortnite\Luvkrimes-Fortnite.exe
-
-An optional per-user environment override can still be used for development:
-LUVKRIMES_TARGET_FORTNITE
-
-Local settings, logs and remembered licenses are stored under:
-%LOCALAPPDATA%\luvkrimes
-
-This package does not require Visual Studio or a source checkout.
-"@
-
-Set-Content -LiteralPath (Join-Path $stage "README.txt") -Value $readme -Encoding utf8NoBOM
-
-$portablePath = Join-Path $output ("Luvkrimes-Portable-" + $Version + ".zip")
-Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $portablePath -CompressionLevel Optimal
-
-$makensisCommand = Get-Command "makensis.exe" -ErrorAction SilentlyContinue
-$makensisPath = if ($makensisCommand) {
-    $makensisCommand.Source
-} else {
-    ""
-}
-
-if ([string]::IsNullOrWhiteSpace($makensisPath)) {
-    $candidates = @(
-        "$env:ProgramFiles\NSIS\makensis.exe",
-        "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
-    )
-
-    foreach ($candidate in $candidates) {
-        if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
-            $makensisPath = $candidate
-            break
-        }
-    }
-}
-
-if ([string]::IsNullOrWhiteSpace($makensisPath)) {
-    throw "makensis.exe was not found. Install NSIS before packaging."
-}
-
-$installerScript = Join-Path $root "installer\luvkrimes.nsi"
-
-& $makensisPath `
-    "/DVERSION=$Version" `
-    "/DNUMERICVERSION=$numericVersion" `
-    "/DSOURCEDIR=$stage" `
-    "/DOUTDIR=$output" `
-    $installerScript
-
-if ($LASTEXITCODE -ne 0) {
-    throw "NSIS failed with exit code $LASTEXITCODE."
-}
-
-$installerPath = Join-Path $output ("Luvkrimes-Setup-" + $Version + ".exe")
-if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
-    throw "Installer was not created: $installerPath"
-}
-
-$checksumPath = Join-Path $output "SHA256SUMS.txt"
-$assets = @(
-    $installerPath,
-    $portablePath
-)
-
-$checksumLines = foreach ($asset in $assets) {
-    $hash = Get-FileHash -LiteralPath $asset -Algorithm SHA256
-    "{0}  {1}" -f $hash.Hash.ToLowerInvariant(), (Split-Path -Leaf $asset)
-}
-
-Set-Content -LiteralPath $checksumPath -Value $checksumLines -Encoding ascii
-
-Write-Host "Release package created:"
-Write-Host "  $installerPath"
-Write-Host "  $portablePath"
-Write-Host "  $checksumPath"
-) {
+if ($Version -notmatch '^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)([-.][0-9A-Za-z.-]+)?$') {
     throw "Version '$Version' is not a supported semantic version."
 }
 
 $numericVersion = "{0}.{1}.{2}.0" -f $Matches.major, $Matches.minor, $Matches.patch
-
 $root = Split-Path -Parent $PSScriptRoot
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
@@ -173,16 +57,16 @@ Luvkrimes $Version
 3. Authenticate with the license key supplied for that product.
 4. Use LAUNCH after authentication.
 
-The packaged Fortnite executable is stored under:
+Packaged Fortnite executable:
 projects\fortnite\Luvkrimes-Fortnite.exe
 
-An optional per-user environment override can still be used for development:
+Optional development override:
 LUVKRIMES_TARGET_FORTNITE
 
-Local settings, logs and remembered licenses are stored under:
+Local settings, logs and remembered licenses:
 %LOCALAPPDATA%\luvkrimes
 
-This package does not require Visual Studio or a source checkout.
+Visual Studio and the source repository are not required.
 "@
 
 Set-Content -LiteralPath (Join-Path $stage "README.txt") -Value $readme -Encoding utf8NoBOM
@@ -191,11 +75,7 @@ $portablePath = Join-Path $output ("Luvkrimes-Portable-" + $Version + ".zip")
 Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $portablePath -CompressionLevel Optimal
 
 $makensisCommand = Get-Command "makensis.exe" -ErrorAction SilentlyContinue
-$makensisPath = if ($makensisCommand) {
-    $makensisCommand.Source
-} else {
-    ""
-}
+$makensisPath = if ($makensisCommand) { $makensisCommand.Source } else { "" }
 
 if ([string]::IsNullOrWhiteSpace($makensisPath)) {
     $candidates = @(
@@ -219,6 +99,7 @@ $installerScript = Join-Path $root "installer\luvkrimes.nsi"
 
 & $makensisPath `
     "/DVERSION=$Version" `
+    "/DNUMERICVERSION=$numericVersion" `
     "/DSOURCEDIR=$stage" `
     "/DOUTDIR=$output" `
     $installerScript
@@ -233,10 +114,7 @@ if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
 }
 
 $checksumPath = Join-Path $output "SHA256SUMS.txt"
-$assets = @(
-    $installerPath,
-    $portablePath
-)
+$assets = @($installerPath, $portablePath)
 
 $checksumLines = foreach ($asset in $assets) {
     $hash = Get-FileHash -LiteralPath $asset -Algorithm SHA256
