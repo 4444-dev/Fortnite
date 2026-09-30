@@ -72,6 +72,16 @@ Unhandled process crashes write a `MiniDumpNormal` file into a `crashdumps` fold
 
 A separate `loader/luvkrimes-loader.vcxproj` project provides a dark ImGui authentication window using KeyAuth API 1.3.
 
+The loader is split into focused components rather than a single entry-point file:
+- `loader_main.cpp` — runtime orchestration only.
+- `loader_window.*` — Win32 window lifetime, message pump, dragging and resize forwarding.
+- `loader_renderer.*` — D3D11/ImGui lifetime, swap-chain resize and frame presentation using RAII COM ownership.
+- `loader_ui.*` — product selection and authentication UI state.
+- `auth_controller.*` — asynchronous KeyAuth initialization, license authentication and session revalidation.
+- `license_store.*` — product-scoped DPAPI persistence.
+- `launch_target.*` — product-specific post-authentication process launch.
+- `product_registry.hpp` — compile-time product definitions and registry validation.
+
 The KeyAuth SDK is not vendored into this repository. The loader's pre-build step runs `scripts/bootstrap-keyauth.ps1`, which fetches the official KeyAuth 1.3 C++ library at pinned commit `486c83e6259f508ba0396f3156e50792a34a4576`. The optional upstream `Security.hpp` and `killEmulator.hpp` modules are removed after bootstrap, leaving normal authentication/session behavior without optional anti-analysis or emulator-killing logic.
 
 The loader is now product-driven through `loader/product_registry.hpp`. Each product owns an independent KeyAuth configuration, an independent remembered-license file, and an independent launch target.
