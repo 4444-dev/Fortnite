@@ -63,6 +63,29 @@ inline constexpr std::array Products{
 	ApexLegends
 };
 
+[[nodiscard]] inline constexpr bool RegistryIsValid() noexcept {
+	for (std::size_t i = 0; i < Products.size(); ++i) {
+		const auto& product = Products[i];
+		if (product.Slug.empty() || product.DisplayName.empty() || product.TargetEnvironmentVariable.empty()) {
+			return false;
+		}
+		if (product.Configured &&
+			(product.KeyAuthName.empty() || product.KeyAuthOwnerId.empty() ||
+			 product.KeyAuthVersion.empty() || product.KeyAuthUrl.empty())) {
+			return false;
+		}
+		for (std::size_t j = i + 1; j < Products.size(); ++j) {
+			if (product.Id == Products[j].Id || product.Slug == Products[j].Slug ||
+				product.TargetEnvironmentVariable == Products[j].TargetEnvironmentVariable) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+static_assert(RegistryIsValid(), "Product registry contains an invalid or duplicate product definition");
+
 static_assert(
 	Fortnite.KeyAuthOwnerId.size() == 10,
 	"Fortnite KeyAuth owner ID must be 10 characters"
