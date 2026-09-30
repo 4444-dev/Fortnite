@@ -113,6 +113,10 @@ bool RunProductRegistryTests() {
 		"Fortnite configured"
 	);
 	ok &= Check(
+		loader::Fortnite.KeyAuthUrl.starts_with("https://"),
+		"configured KeyAuth endpoint uses HTTPS"
+	);
+	ok &= Check(
 		!loader::ApexLegends.Configured,
 		"Apex remains disabled until configured"
 	);
@@ -144,6 +148,14 @@ bool RunProductRegistryTests() {
 	ok &= Check(
 		!loader::IsValidProductSlug("../fortnite"),
 		"reject path-like product slug"
+	);
+	ok &= Check(
+		loader::IsValidProductSlug(std::string(64, 'a')),
+		"accept maximum-length product slug"
+	);
+	ok &= Check(
+		!loader::IsValidProductSlug(std::string(65, 'a')),
+		"reject oversized product slug"
 	);
 
 	return ok;
