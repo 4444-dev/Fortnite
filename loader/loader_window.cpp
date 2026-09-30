@@ -17,8 +17,8 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(
 namespace loader {
 namespace {
 
-constexpr wchar_t kClassName[] = L"LuvkrimesLoaderWindow";
-constexpr wchar_t kWindowTitle[] = L"luvkrimes loader";
+constexpr wchar_t kClassName[] = L"NexusLoaderWindow";
+constexpr wchar_t kWindowTitle[] = L"Nexus";
 constexpr int kWindowWidth = 620;
 constexpr int kWindowHeight = 390;
 constexpr int kDragRegionHeight = 38;
