@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <string_view>
 
 namespace loader {
@@ -26,65 +27,103 @@ struct ProductDefinition {
 	bool Configured;
 };
 
-inline constexpr ProductDefinition Fortnite{
-	ProductId::Fortnite,
-	"fortnite",
-	"FORTNITE",
-	"Fortnite project",
-	"Timocod18ytb's Application",
-	"ZOhORJsXc1",
-	"1.0",
-	"https://keyauth.win/api/1.3/",
-	"",
-	L"LUVKRIMES_TARGET_FORTNITE",
-	true
-};
+[[nodiscard]] inline constexpr bool IsValidProductSlug(
+	std::string_view slug
+) noexcept {
+	if (slug.empty() || slug.size() > 64) {
+		return false;
+	}
 
-// Apex is deliberately a separate KeyAuth application. Leave it unavailable
-// until its own KeyAuth application identifiers are supplied. Never reuse the
-// Fortnite owner/application configuration here if separate key pools are
-// required.
-inline constexpr ProductDefinition ApexLegends{
-	ProductId::ApexLegends,
-	"apex",
-	"APEX LEGENDS",
-	"Apex Legends project",
-	"",
-	"",
-	"1.0",
-	"https://keyauth.win/api/1.3/",
-	"",
-	L"LUVKRIMES_TARGET_APEX",
-	false
-};
+	for (const char ch : slug) {
+		const bool valid =
+			(ch >= 'a' && ch <= 'z') ||
+			(ch >= '0' && ch <= '9') ||
+			ch == '-' ||
+			ch == '_';
 
-inline constexpr std::array Products{
-	Fortnite,
-	ApexLegends
-};
+		if (!valid) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+inline constexpr std::array<ProductDefinition, 2> Products{{
+	{
+		ProductId::Fortnite,
+		"fortnite",
+		"FORTNITE",
+		"Fortnite project",
+		"Timocod18ytb's Application",
+		"ZOhORJsXc1",
+		"1.0",
+		"https://keyauth.win/api/1.3/",
+		"",
+		L"LUVKRIMES_TARGET_FORTNITE",
+		true
+	},
+	{
+		ProductId::ApexLegends,
+		"apex",
+		"APEX LEGENDS",
+		"Apex Legends project",
+		"",
+		"",
+		"1.0",
+		"https://keyauth.win/api/1.3/",
+		"",
+		L"LUVKRIMES_TARGET_APEX",
+		false
+	}
+}};
+
+inline constexpr const ProductDefinition& Fortnite = Products[0];
+inline constexpr const ProductDefinition& ApexLegends = Products[1];
 
 [[nodiscard]] inline constexpr bool RegistryIsValid() noexcept {
 	for (std::size_t i = 0; i < Products.size(); ++i) {
 		const auto& product = Products[i];
-		if (product.Slug.empty() || product.DisplayName.empty() || product.TargetEnvironmentVariable.empty()) {
+
+		if (
+			!IsValidProductSlug(product.Slug) ||
+			product.DisplayName.empty() ||
+			product.TargetEnvironmentVariable.empty()
+		) {
 			return false;
 		}
-		if (product.Configured &&
-			(product.KeyAuthName.empty() || product.KeyAuthOwnerId.empty() ||
-			 product.KeyAuthVersion.empty() || product.KeyAuthUrl.empty())) {
+
+		if (
+			product.Configured &&
+			(
+				product.KeyAuthName.empty() ||
+				product.KeyAuthOwnerId.empty() ||
+				product.KeyAuthVersion.empty() ||
+				product.KeyAuthUrl.empty()
+			)
+		) {
 			return false;
 		}
+
 		for (std::size_t j = i + 1; j < Products.size(); ++j) {
-			if (product.Id == Products[j].Id || product.Slug == Products[j].Slug ||
-				product.TargetEnvironmentVariable == Products[j].TargetEnvironmentVariable) {
+			if (
+				product.Id == Products[j].Id ||
+				product.Slug == Products[j].Slug ||
+				product.TargetEnvironmentVariable ==
+					Products[j].TargetEnvironmentVariable
+			) {
 				return false;
 			}
 		}
 	}
+
 	return true;
 }
 
-static_assert(RegistryIsValid(), "Product registry contains an invalid or duplicate product definition");
+static_assert(
+	RegistryIsValid(),
+	"Product registry contains an invalid or duplicate product definition"
+);
 
 static_assert(
 	Fortnite.KeyAuthOwnerId.size() == 10,
@@ -99,6 +138,7 @@ static_assert(
 			return &product;
 		}
 	}
+
 	return nullptr;
 }
 
