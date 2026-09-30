@@ -99,7 +99,8 @@ inline constexpr const ProductDefinition& ApexLegends = Products[1];
 				product.KeyAuthName.empty() ||
 				product.KeyAuthOwnerId.empty() ||
 				product.KeyAuthVersion.empty() ||
-				product.KeyAuthUrl.empty()
+				product.KeyAuthUrl.empty() ||
+				!product.KeyAuthUrl.starts_with("https://")
 			)
 		) {
 			return false;
@@ -111,6 +112,15 @@ inline constexpr const ProductDefinition& ApexLegends = Products[1];
 				product.Slug == Products[j].Slug ||
 				product.TargetEnvironmentVariable ==
 					Products[j].TargetEnvironmentVariable
+			) {
+				return false;
+			}
+
+			if (
+				product.Configured &&
+				Products[j].Configured &&
+				product.KeyAuthName == Products[j].KeyAuthName &&
+				product.KeyAuthOwnerId == Products[j].KeyAuthOwnerId
 			) {
 				return false;
 			}
