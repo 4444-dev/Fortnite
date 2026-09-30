@@ -19,3 +19,4 @@ obj/
 thirdparty/keyauth/
 loader/bin/
 loader/obj/
+dist/
