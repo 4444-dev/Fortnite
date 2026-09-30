@@ -2,19 +2,21 @@ name: Publish release
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
+    branches:
+      - main
+    paths:
+      - release/VERSION
 
 permissions:
   contents: write
 
 concurrency:
-  group: publish-release-${{ github.ref_name }}
+  group: publish-release-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
   release:
-    name: Build and publish ${{ github.ref_name }}
+    name: Build and publish client release
     runs-on: windows-2025
     timeout-minutes: 30
     env:
@@ -22,29 +24,33 @@ jobs:
       WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
 
     steps:
-      - name: Checkout tag
+      - name: Checkout main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Validate release tag and main ancestry
+      - name: Resolve release version
         id: version
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}"
-          if ($tag -notmatch '^v(\d+)\.(\d+)\.(\d+)([-.][0-9A-Za-z.-]+)?$') {
-            throw "Release tag must use semantic versioning, for example v1.0.0."
+          $version = (Get-Content -LiteralPath ".\release\VERSION" -Raw).Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') {
+            throw "release/VERSION must contain a semantic version such as 1.0.0."
           }
 
-          git fetch origin main --no-tags
-          git merge-base --is-ancestor HEAD origin/main
-          if ($LASTEXITCODE -ne 0) {
-            throw "Release tags must point to a commit already present on main."
-          }
-
-          $version = $tag.Substring(1)
+          $tag = "v$version"
           "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
+          $existing = gh release view $tag --repo "${{ github.repository }}" 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            "exists=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "exists=false" >> $env:GITHUB_OUTPUT
+          }
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
@@ -153,11 +159,11 @@ jobs:
             $installer,
             ".\dist\Luvkrimes-Portable-${{ steps.version.outputs.version }}.zip"
           )
-          $lines = foreach ($asset in $assets) {
+          $checksumLines = foreach ($asset in $assets) {
             $hash = Get-FileHash -LiteralPath $asset -Algorithm SHA256
             "{0}  {1}" -f $hash.Hash.ToLowerInvariant(), (Split-Path -Leaf $asset)
           }
-          Set-Content -LiteralPath ".\dist\SHA256SUMS.txt" -Value $lines -Encoding ascii
+          Set-Content -LiteralPath ".\dist\SHA256SUMS.txt" -Value $checksumLines -Encoding ascii
 
       - name: Test packaged installer
         shell: pwsh
@@ -179,6 +185,7 @@ jobs:
             (Join-Path $installDir "projects\fortnite\Luvkrimes-Fortnite.exe"),
             (Join-Path $installDir "Uninstall.exe")
           )
+
           foreach ($path in $required) {
             if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
               throw "Release installer is missing: $path"
@@ -195,7 +202,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "${{ github.ref_name }}"
+          $tag = "${{ steps.version.outputs.tag }}"
           $version = "${{ steps.version.outputs.version }}"
           $assets = @(
             ".\dist\Luvkrimes-Setup-$version.exe",
@@ -203,11 +210,10 @@ jobs:
             ".\dist\SHA256SUMS.txt"
           )
 
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag @assets --clobber
+          if ("${{ steps.version.outputs.exists }}" -eq "true") {
+            gh release upload $tag @assets --clobber --repo "${{ github.repository }}"
           } else {
-            gh release create $tag @assets --verify-tag --generate-notes --title "Luvkrimes $tag"
+            gh release create $tag @assets --target "${{ github.sha }}" --generate-notes --title "Luvkrimes $tag" --repo "${{ github.repository }}"
           }
 
           if ($LASTEXITCODE -ne 0) {
