@@ -22,7 +22,7 @@ GitHub Actions builds both:
 
 on pull requests targeting `main`, and on pushes to `main`.
 
-The same matrix builds and executes the standalone regression tests in `tests/`. CI also verifies that the application, loader and test executables were actually produced before running the test binary. First-party C++ warnings are treated as errors; bundled/vendor sources keep their own warning policy.
+The same matrix builds and executes the standalone regression tests in `tests/` twice per configuration to catch state leakage between runs. CI also verifies that the application, loader and test executables were actually produced before running the test binary. First-party C++ warnings and all linker warnings are treated as errors; the current Debug and Release builds complete with zero compiler/linker warnings.
 
 ## Runtime architecture
 
@@ -100,6 +100,6 @@ Post-authentication launch targets are product-specific:
 
 Adding another project later only requires a new entry in `product_registry.hpp` with its own KeyAuth application configuration and target variable. Registry invariants reject duplicate IDs, slugs and target variables at compile time.
 
-The regression suite covers configuration parsing/persistence, product-registry lookup and slug rules, DPAPI remembered-license save/load/clear behavior, disabled-product launch rejection, projection edge cases and transform/quaternion consistency.
+The regression suite covers configuration parsing/persistence, product-registry lookup and slug rules, isolated DPAPI remembered-license save/load/clear behavior, maximum-size and corruption handling, cryptographic cross-product rejection, disabled-product launch rejection, projection edge cases and transform/quaternion consistency.
 
 No injection, process hiding, anti-debugging, VM detection, or driver concealment is performed by the loader.
