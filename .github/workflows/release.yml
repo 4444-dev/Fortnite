@@ -105,7 +105,7 @@ jobs:
         id: signing
         shell: pwsh
         run: |
-          $certificatePath = Join-Path $env:RUNNER_TEMP "luvkrimes-signing.pfx"
+          $certificatePath = Join-Path $env:RUNNER_TEMP "nexus-signing.pfx"
           [IO.File]::WriteAllBytes(
             $certificatePath,
             [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64)
@@ -127,8 +127,8 @@ jobs:
         shell: pwsh
         run: |
           $targets = @(
-            ".\loader\bin\x64\Release\luvkrimes-loader.exe",
-            ".\luvkrimes base\x64\Release\luvkrimes base.exe"
+            ".\loader\bin\x64\Release\Nexus.exe",
+            ".\luvkrimes base\x64\Release\Nexus-Fortnite.exe"
           )
 
           foreach ($target in $targets) {
@@ -152,7 +152,7 @@ jobs:
         if: env.WINDOWS_CERTIFICATE_BASE64 != ''
         shell: pwsh
         run: |
-          $installer = ".\dist\Luvkrimes-Setup-${{ steps.version.outputs.version }}.exe"
+          $installer = ".\dist\Nexus-Setup-${{ steps.version.outputs.version }}.exe"
           & "${{ steps.signing.outputs.signtool }}" sign /fd SHA256 /f "${{ steps.signing.outputs.certificate }}" /p "$env:WINDOWS_CERTIFICATE_PASSWORD" /tr "http://timestamp.digicert.com" /td SHA256 $installer
           if ($LASTEXITCODE -ne 0) {
             throw "Installer code signing failed."
@@ -160,7 +160,7 @@ jobs:
 
           $assets = @(
             $installer,
-            ".\dist\Luvkrimes-Portable-${{ steps.version.outputs.version }}.zip"
+            ".\dist\Nexus-Portable-${{ steps.version.outputs.version }}.zip"
           )
           $checksumLines = foreach ($asset in $assets) {
             $hash = Get-FileHash -LiteralPath $asset -Algorithm SHA256
@@ -171,8 +171,8 @@ jobs:
       - name: Test packaged installer
         shell: pwsh
         run: |
-          $installer = (Resolve-Path ".\dist\Luvkrimes-Setup-${{ steps.version.outputs.version }}.exe").Path
-          $installDir = Join-Path $env:RUNNER_TEMP "luvkrimes-release-install"
+          $installer = (Resolve-Path ".\dist\Nexus-Setup-${{ steps.version.outputs.version }}.exe").Path
+          $installDir = Join-Path $env:RUNNER_TEMP "nexus-release-install"
 
           if (Test-Path -LiteralPath $installDir) {
             Remove-Item -LiteralPath $installDir -Recurse -Force
@@ -184,8 +184,8 @@ jobs:
           }
 
           $required = @(
-            (Join-Path $installDir "Luvkrimes.exe"),
-            (Join-Path $installDir "projects\fortnite\Luvkrimes-Fortnite.exe"),
+            (Join-Path $installDir "Nexus.exe"),
+            (Join-Path $installDir "projects\fortnite\Nexus-Fortnite.exe"),
             (Join-Path $installDir "Uninstall.exe")
           )
 
@@ -208,15 +208,15 @@ jobs:
           $tag = "${{ steps.version.outputs.tag }}"
           $version = "${{ steps.version.outputs.version }}"
           $assets = @(
-            ".\dist\Luvkrimes-Setup-$version.exe",
-            ".\dist\Luvkrimes-Portable-$version.zip",
+            ".\dist\Nexus-Setup-$version.exe",
+            ".\dist\Nexus-Portable-$version.zip",
             ".\dist\SHA256SUMS.txt"
           )
 
           if ("${{ steps.version.outputs.exists }}" -eq "true") {
             gh release upload $tag @assets --clobber --repo "${{ github.repository }}"
           } else {
-            gh release create $tag @assets --target "${{ github.sha }}" --generate-notes --title "Luvkrimes $tag" --repo "${{ github.repository }}"
+            gh release create $tag @assets --target "${{ github.sha }}" --generate-notes --title "Nexus $tag" --repo "${{ github.repository }}"
           }
 
           if ($LASTEXITCODE -ne 0) {
