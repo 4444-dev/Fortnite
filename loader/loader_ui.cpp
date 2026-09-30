@@ -7,6 +7,7 @@
 #include <thirdparty/imgui/imgui.h>
 
 #include <algorithm>
+#include <cfloat>
 #include <cstring>
 #include <string>
 
@@ -309,7 +310,7 @@ bool ProductTile(
 					: "Apex-Radar.exe")
 			: !product.PackagedTargetRelativePath.empty()
 				? "Radar Included - KeyAuth Required"
-				: "Configuration requise";
+				: "Configuration Required";
 
 	draw->AddText(
 		ImVec2(start.x + 16.0f, end.y - 29.0f),
@@ -981,7 +982,7 @@ void UiController::DrawHome(
 	const char* productName =
 		m_SelectedProduct
 			? m_SelectedProduct->DisplayName.data()
-			: "produit";
+			: "product";
 
 	ImGui::SetCursorPos(
 		ImVec2(20.0f, 50.0f)
