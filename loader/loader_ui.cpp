@@ -336,6 +336,7 @@ void UiController::DrawAuthentication(bool& requestClose) {
 
 		ImGui::Spacing();
 
+		ImGui::BeginDisabled(snapshot.Busy);
 		if (ImGui::Button(
 			"LAUNCH",
 			ImVec2(-1.0f, 38.0f)
@@ -344,6 +345,7 @@ void UiController::DrawAuthentication(bool& requestClose) {
 				requestClose = true;
 			}
 		}
+		ImGui::EndDisabled();
 
 		if (!m_LaunchStatus.empty()) {
 			ImGui::TextWrapped(
