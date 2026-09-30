@@ -382,74 +382,26 @@ void DrawAuthentication(
 } // namespace
 
 int WINAPI wWinMain(
-	HINSTANCE instance,
+	HINSTANCE,
 	HINSTANCE,
 	PWSTR,
 	int
 ) {
-	ImGui_ImplWin32_EnableDpiAwareness();
+	loader::Renderer renderer;
+	loader::Window window;
 
-	WNDCLASSEXW wc{};
-	wc.cbSize = sizeof(wc);
-	wc.lpfnWndProc = &WndProc;
-	wc.hInstance = instance;
-	wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-	wc.lpszClassName = kClassName;
-
-	if (!RegisterClassExW(&wc)) {
+	if (!window.Create()) {
 		return 1;
 	}
 
-	HWND hwnd = CreateWindowExW(
-		WS_EX_APPWINDOW,
-		kClassName,
-		kWindowTitle,
-		WS_POPUP,
-		CW_USEDEFAULT,
-		CW_USEDEFAULT,
-		kWindowWidth,
-		kWindowHeight,
-		nullptr,
-		nullptr,
-		instance,
-		nullptr
-	);
+	window.AttachRenderer(&renderer);
 
-	if (!hwnd) {
-		UnregisterClassW(kClassName, instance);
+	if (!renderer.Initialize(window.Handle())) {
 		return 1;
 	}
-
-	CenterWindow(hwnd);
-
-	if (!CreateDevice(hwnd)) {
-		CleanupDevice();
-		DestroyWindow(hwnd);
-		UnregisterClassW(kClassName, instance);
-		return 1;
-	}
-
-	ShowWindow(hwnd, SW_SHOWDEFAULT);
-	UpdateWindow(hwnd);
-
-	ImGui::CreateContext();
-
-	ImGuiIO& io = ImGui::GetIO();
-	io.IniFilename = nullptr;
-	io.LogFilename = nullptr;
 
 	ApplyStyle();
-
-	if (
-		!ImGui_ImplWin32_Init(hwnd) ||
-		!ImGui_ImplDX11_Init(g_Dx.Device, g_Dx.Context)
-	) {
-		ImGui::DestroyContext();
-		CleanupDevice();
-		DestroyWindow(hwnd);
-		UnregisterClassW(kClassName, instance);
-		return 1;
-	}
+	window.Show();
 
 	Screen screen = Screen::ProductSelect;
 	const loader::ProductDefinition* selectedProduct = nullptr;
@@ -458,32 +410,18 @@ int WINAPI wWinMain(
 	LicenseBuffer license{};
 	std::string launchStatus;
 	bool remember = true;
-
 	bool running = true;
 
-	while (running) {
-		MSG msg{};
-
-		while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
-			if (msg.message == WM_QUIT) {
-				running = false;
-			}
-
-			TranslateMessage(&msg);
-			DispatchMessageW(&msg);
-		}
-
-		if (!running) {
-			break;
-		}
-
+	while (running && window.PumpMessages()) {
 		if (auth) {
 			auth->Tick();
 		}
 
-		ImGui_ImplDX11_NewFrame();
-		ImGui_ImplWin32_NewFrame();
-		ImGui::NewFrame();
+		if (!renderer.IsReady()) {
+			break;
+		}
+
+		renderer.BeginFrame();
 
 		ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
 		ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
@@ -552,32 +490,8 @@ int WINAPI wWinMain(
 		}
 
 		ImGui::End();
-		ImGui::Render();
 
-		constexpr float clear[4] = {
-			0.055f,
-			0.055f,
-			0.060f,
-			1.0f
-		};
-
-		g_Dx.Context->OMSetRenderTargets(
-			1,
-			&g_Dx.Target,
-			nullptr
-		);
-
-		g_Dx.Context->ClearRenderTargetView(
-			g_Dx.Target,
-			clear
-		);
-
-		ImGui_ImplDX11_RenderDrawData(
-			ImGui::GetDrawData()
-		);
-
-		const HRESULT presentResult = g_Dx.SwapChain->Present(1, 0);
-		if (FAILED(presentResult) && presentResult != DXGI_STATUS_OCCLUDED) {
+		if (!renderer.EndFrame()) {
 			running = false;
 		}
 
@@ -587,14 +501,9 @@ int WINAPI wWinMain(
 	}
 
 	auth.reset();
-
-	ImGui_ImplDX11_Shutdown();
-	ImGui_ImplWin32_Shutdown();
-	ImGui::DestroyContext();
-
-	CleanupDevice();
-	DestroyWindow(hwnd);
-	UnregisterClassW(kClassName, instance);
+	window.AttachRenderer(nullptr);
+	renderer.Shutdown();
+	window.Destroy();
 
 	return 0;
 }
