@@ -7,6 +7,92 @@
 #include <vector>
 
 namespace loader {
+namespace {
+
+std::string WideToUtf8(const wchar_t* text) {
+	if (!text || !*text) {
+		return {};
+	}
+
+	const int required = WideCharToMultiByte(
+		CP_UTF8,
+		0,
+		text,
+		-1,
+		nullptr,
+		0,
+		nullptr,
+		nullptr
+	);
+
+	if (required <= 1) {
+		return {};
+	}
+
+	std::string output(
+		static_cast<std::size_t>(required),
+		'\0'
+	);
+
+	const int converted = WideCharToMultiByte(
+		CP_UTF8,
+		0,
+		text,
+		-1,
+		output.data(),
+		required,
+		nullptr,
+		nullptr
+	);
+
+	if (converted <= 1) {
+		return {};
+	}
+
+	output.resize(static_cast<std::size_t>(converted - 1));
+
+	while (
+		!output.empty() &&
+		(output.back() == '\r' || output.back() == '\n' || output.back() == ' ')
+	) {
+		output.pop_back();
+	}
+
+	return output;
+}
+
+std::string WindowsErrorText(DWORD error) {
+	wchar_t* buffer = nullptr;
+
+	const DWORD length = FormatMessageW(
+		FORMAT_MESSAGE_ALLOCATE_BUFFER |
+			FORMAT_MESSAGE_FROM_SYSTEM |
+			FORMAT_MESSAGE_IGNORE_INSERTS,
+		nullptr,
+		error,
+		0,
+		reinterpret_cast<wchar_t*>(&buffer),
+		0,
+		nullptr
+	);
+
+	std::string text;
+	if (length > 0 && buffer) {
+		text = WideToUtf8(buffer);
+	}
+
+	if (buffer) {
+		LocalFree(buffer);
+	}
+
+	if (text.empty()) {
+		return "Windows error " + std::to_string(error);
+	}
+
+	return text + " (Windows error " + std::to_string(error) + ")";
+}
+
+} // namespace
 
 bool LaunchConfiguredTarget(
 	const ProductDefinition& product,
@@ -83,9 +169,9 @@ bool LaunchConfiguredTarget(
 	)) {
 		const DWORD error = GetLastError();
 		message =
-			"Failed to start configured target (Windows error " +
-			std::to_string(error) +
-			").";
+			"Failed to start configured target: " +
+			WindowsErrorText(error) +
+			".";
 		return false;
 	}
 
