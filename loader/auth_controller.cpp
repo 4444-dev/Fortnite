@@ -2,10 +2,35 @@
 
 #include "license_store.hpp"
 
+#include <Windows.h>
+
 #include <exception>
 #include <utility>
 
 namespace loader {
+namespace {
+
+class ScopedStringWipe final {
+public:
+	explicit ScopedStringWipe(std::string& value) noexcept
+		: m_Value(value) {
+	}
+
+	~ScopedStringWipe() {
+		if (!m_Value.empty()) {
+			SecureZeroMemory(m_Value.data(), m_Value.size());
+		}
+	}
+
+	ScopedStringWipe(const ScopedStringWipe&) = delete;
+	ScopedStringWipe& operator=(const ScopedStringWipe&) = delete;
+
+private:
+	std::string& m_Value;
+};
+
+} // namespace
+
 
 AuthController::AuthController(const ProductDefinition& product)
 	: m_Product(product),
@@ -73,7 +98,8 @@ void AuthController::Authenticate(std::string license, bool remember) {
 	Run(
 		AuthState::Authenticating,
 		"Validating " + std::string(m_Product.DisplayName) + " license...",
-		[this, license = std::move(license), remember] {
+		[this, license = std::move(license), remember]() mutable {
+			ScopedStringWipe wipe(license);
 			m_App.license(license);
 
 			std::scoped_lock lock(m_Mutex);
