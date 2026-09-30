@@ -163,7 +163,125 @@ if (-not $alreadyReturns) {
     $lines.Insert($tfaEnd, "    return *this;")
 }
 
-Set-Content -LiteralPath $authCpp -Value $lines
+function Add-FallbackReturn(
+    [System.Collections.Generic.List[string]]$source,
+    [string]$signatureRegex,
+    [string]$returnLine,
+    [string]$description
+) {
+    $start = -1
+    for ($i = 0; $i -lt $source.Count; $i++) {
+        if ($source[$i] -match $signatureRegex) {
+            $start = $i
+            break
+        }
+    }
+
+    if ($start -lt 0) {
+        throw "Could not locate KeyAuth function: $description."
+    }
+
+    $depth = 0
+    $started = $false
+    $end = -1
+
+    for ($i = $start; $i -lt $source.Count; $i++) {
+        $openCount = ([regex]::Matches($source[$i], '\{')).Count
+        $closeCount = ([regex]::Matches($source[$i], '\}')).Count
+
+        if ($openCount -gt 0) {
+            $started = $true
+        }
+
+        $depth += $openCount
+        $depth -= $closeCount
+
+        if ($started -and $depth -eq 0) {
+            $end = $i
+            break
+        }
+    }
+
+    if ($end -lt 0) {
+        throw "Could not locate the end of KeyAuth function: $description."
+    }
+
+    if ($end -gt $start -and $source[$end - 1].Trim() -ne $returnLine.Trim()) {
+        $source.Insert($end, $returnLine)
+    }
+}
+
+# Several upstream functions terminate through KA_EXIT on error paths. MSVC
+# cannot prove that those paths never return, so add explicit defensive
+# fallbacks to keep control-flow contracts well-formed.
+Add-FallbackReturn $lines '^std::string KeyAuth::api::getvar\(' '    return {};' 'getvar'
+Add-FallbackReturn $lines '^bool KeyAuth::api::checkblack\(' '    return false;' 'checkblack'
+Add-FallbackReturn $lines '^std::string KeyAuth::api::var\(' '    return {};' 'var'
+Add-FallbackReturn $lines '^std::string KeyAuth::api::webhook\(' '    return {};' 'webhook'
+Add-FallbackReturn $lines '^std::string KeyAuth::api::fetchonline\(' '    return {};' 'fetchonline'
+
+$text = $lines -join [Environment]::NewLine
+
+$oldFilenameConversion = @'
+    std::wstring filenameOnlyString(filename_only);
+
+    std::string filenameOnly(filenameOnlyString.begin(), filenameOnlyString.end());
+'@
+
+$newFilenameConversion = @'
+    std::wstring filenameOnlyString(filename_only);
+
+    std::string filenameOnly;
+    const int utf8Size = WideCharToMultiByte(
+        CP_UTF8,
+        0,
+        filenameOnlyString.c_str(),
+        -1,
+        nullptr,
+        0,
+        nullptr,
+        nullptr
+    );
+    if (utf8Size > 1) {
+        filenameOnly.resize(static_cast<std::size_t>(utf8Size));
+        const int converted = WideCharToMultiByte(
+            CP_UTF8,
+            0,
+            filenameOnlyString.c_str(),
+            -1,
+            filenameOnly.data(),
+            utf8Size,
+            nullptr,
+            nullptr
+        );
+        if (converted > 0) {
+            filenameOnly.resize(static_cast<std::size_t>(converted - 1));
+        }
+        else {
+            filenameOnly.clear();
+        }
+    }
+'@
+
+if (-not $text.Contains($oldFilenameConversion)) {
+    throw "Could not locate KeyAuth filename conversion compatibility block."
+}
+$text = $text.Replace($oldFilenameConversion, $newFilenameConversion)
+
+Set-Content -LiteralPath $authCpp -Value $text
+
+$pingoutCpp = Join-Path $target "QRCode\pingout.cpp"
+if (-not (Test-Path -LiteralPath $pingoutCpp -PathType Leaf)) {
+    throw "KeyAuth bootstrap is incomplete: QRCode/pingout.cpp was not found."
+}
+
+$pingout = Get-Content -LiteralPath $pingoutCpp -Raw
+$invalidPragma = "#pragma warning(disable:C4146)"
+if (-not $pingout.Contains($invalidPragma)) {
+    throw "Could not locate the malformed KeyAuth QRCode warning pragma."
+}
+$pingout = $pingout.Replace($invalidPragma, "")
+Set-Content -LiteralPath $pingoutCpp -Value $pingout
 
 $actual = Get-CurrentCommit
 if ($actual -ne $pinnedCommit) {
