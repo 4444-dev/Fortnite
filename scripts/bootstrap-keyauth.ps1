@@ -45,6 +45,30 @@ if ($current -ne $pinnedCommit) {
 Remove-Item (Join-Path $target "Security.hpp") -Force -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $target "killEmulator.hpp") -Force -ErrorAction SilentlyContinue
 
+# Upstream currently contains one unguarded LockMemAccess() call even though
+# Security.hpp is optional. Guard that call so the SDK still compiles when the
+# optional anti-analysis module is intentionally excluded.
+$authCpp = Join-Path $target "auth.cpp"
+$authText = Get-Content $authCpp -Raw
+$unguarded = @'
+        if(!LockMemAccess())
+        {
+            error(XorStr("LockMemAccess() failed, don't tamper with the program."));
+        }
+'@
+$guarded = @'
+#if KEYAUTH_HAVE_SECURITY
+        if(!LockMemAccess())
+        {
+            error(XorStr("LockMemAccess() failed, don't tamper with the program."));
+        }
+#endif
+'@
+if ($authText.Contains($unguarded)) {
+    $authText = $authText.Replace($unguarded, $guarded)
+    Set-Content -Path $authCpp -Value $authText -NoNewline
+}
+
 $actual = Get-CurrentCommit
 if ($actual -ne $pinnedCommit) {
     throw "KeyAuth bootstrap verification failed. Expected $pinnedCommit, got $actual."
