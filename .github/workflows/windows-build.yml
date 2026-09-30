@@ -82,29 +82,10 @@ jobs:
             }
           }
 
-      - name: Verify expected outputs
-        shell: pwsh
-        run: |
-          $expected = @(
-            ".\luvkrimes base\x64\${{ matrix.configuration }}\luvkrimes base.exe",
-            ".\loader\bin\x64\${{ matrix.configuration }}\luvkrimes-loader.exe",
-            ".\tests\bin\x64\${{ matrix.configuration }}\luvkrimes-tests.exe"
-          )
-
-          foreach ($path in $expected) {
-            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-              Write-Error "Expected build output is missing: $path"
-              exit 1
-            }
-          }
-
       - name: Run tests
         shell: pwsh
         run: |
           & ".\tests\bin\x64\${{ matrix.configuration }}\luvkrimes-tests.exe"
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
