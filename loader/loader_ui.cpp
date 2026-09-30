@@ -33,15 +33,32 @@ void DrawLogo(ImDrawList* draw, const ImVec2& pos) {
 		ImGui::GetFont(),
 		31.0f,
 		ImVec2(pos.x + 1.0f, pos.y + 2.0f),
-		IM_COL32(60, 22, 105, 180),
+		IM_COL32(42, 24, 72, 200),
 		"NEXUS"
 	);
+
 	draw->AddText(
 		ImGui::GetFont(),
 		31.0f,
 		pos,
+		IM_COL32(239, 241, 255, 255),
+		"NE"
+	);
+
+	const float prefixWidth =
+		ImGui::GetFont()->CalcTextSizeA(
+			31.0f,
+			1000.0f,
+			0.0f,
+			"NE"
+		).x;
+
+	draw->AddText(
+		ImGui::GetFont(),
+		31.0f,
+		ImVec2(pos.x + prefixWidth, pos.y),
 		kPurpleBright,
-		"NEXUS"
+		"XUS"
 	);
 }
 
@@ -676,6 +693,34 @@ void UiController::DrawHome(
 		IM_COL32(115, 36, 212, 18),
 		64
 	);
+
+	draw->AddText(
+		ImGui::GetFont(),
+		86.0f,
+		ImVec2(
+			origin.x + windowSize.x - 400.0f,
+			origin.y + 84.0f
+		),
+		IM_COL32(154, 74, 238, 18),
+		"NEXUS"
+	);
+
+	for (int index = 0; index < 4; ++index) {
+		const float offset =
+			static_cast<float>(index) * 44.0f;
+		draw->AddLine(
+			ImVec2(
+				origin.x + windowSize.x - 310.0f + offset,
+				origin.y + 72.0f
+			),
+			ImVec2(
+				origin.x + windowSize.x - 410.0f + offset,
+				origin.y + 172.0f
+			),
+			IM_COL32(164, 76, 255, 22),
+			8.0f
+		);
+	}
 
 	draw->AddText(
 		ImGui::GetFont(),
