@@ -87,6 +87,8 @@
 
   <ItemGroup>
     <ClCompile Include="loader_main.cpp" />
+    <ClCompile Include="auth_controller.cpp" />
+    <ClCompile Include="launch_target.cpp" />
     <ClCompile Include="license_store.cpp" />
     <ClCompile Include="..\luvkrimes base\thirdparty\imgui\imgui.cpp">
       <WarningLevel>Level3</WarningLevel>
@@ -124,6 +126,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ClInclude Include="auth_controller.hpp" />
+    <ClInclude Include="launch_target.hpp" />
     <ClInclude Include="license_store.hpp" />
     <ClInclude Include="product_registry.hpp" />
   </ItemGroup>
