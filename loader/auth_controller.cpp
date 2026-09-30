@@ -39,7 +39,6 @@ private:
 
 } // namespace
 
-
 AuthController::AuthController(const ProductDefinition& product)
 	: m_Product(product),
 	  m_App(
@@ -62,6 +61,7 @@ void AuthController::Initialize() {
 		m_Snapshot.Status = "Product authentication configuration is incomplete.";
 		m_Snapshot.Busy = false;
 		m_Snapshot.Authenticated = false;
+		ClearIdentity(m_Snapshot);
 		return;
 	}
 
@@ -101,6 +101,7 @@ void AuthController::Authenticate(std::string license, bool remember) {
 			: "License key exceeds the supported length.";
 		m_Snapshot.Busy = false;
 		m_Snapshot.Authenticated = false;
+		ClearIdentity(m_Snapshot);
 		return;
 	}
 
@@ -231,11 +232,13 @@ void AuthController::Run(
 					m_Snapshot.State = AuthState::Error;
 					m_Snapshot.Status = exception.what();
 					m_Snapshot.Authenticated = false;
+					ClearIdentity(m_Snapshot);
 				} catch (...) {
 					std::scoped_lock lock(m_Mutex);
 					m_Snapshot.State = AuthState::Error;
 					m_Snapshot.Status = "Unexpected authentication error.";
 					m_Snapshot.Authenticated = false;
+					ClearIdentity(m_Snapshot);
 				}
 
 				{
@@ -264,6 +267,5 @@ void AuthController::JoinWorker() {
 		m_Worker.join();
 	}
 }
-
 
 } // namespace loader
