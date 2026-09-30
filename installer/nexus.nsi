@@ -59,6 +59,25 @@ VIAddVersionKey /LANG=1033 "LegalCopyright" "Copyright ${PRODUCT_PUBLISHER}"
 Section "Nexus" SEC_MAIN
     SetShellVarContext current
 
+    ; Remove only known v1.0.0 Luvkrimes program files and shortcuts.
+    ; User data under %LOCALAPPDATA%\luvkrimes is preserved for migration.
+    Delete "$DESKTOP\Luvkrimes.lnk"
+    Delete "$SMPROGRAMS\Luvkrimes\Luvkrimes.lnk"
+    Delete "$SMPROGRAMS\Luvkrimes\Uninstall Luvkrimes.lnk"
+    RMDir "$SMPROGRAMS\Luvkrimes"
+
+    Delete "$LocalAppData\Programs\Luvkrimes\projects\fortnite\Luvkrimes-Fortnite.exe"
+    RMDir "$LocalAppData\Programs\Luvkrimes\projects\fortnite"
+    RMDir "$LocalAppData\Programs\Luvkrimes\projects"
+    Delete "$LocalAppData\Programs\Luvkrimes\Luvkrimes.exe"
+    Delete "$LocalAppData\Programs\Luvkrimes\README.txt"
+    Delete "$LocalAppData\Programs\Luvkrimes\VERSION.txt"
+    Delete "$LocalAppData\Programs\Luvkrimes\Uninstall.exe"
+    RMDir "$LocalAppData\Programs\Luvkrimes"
+
+    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Luvkrimes"
+    DeleteRegKey HKCU "Software\Luvkrimes"
+
     SetOutPath "$INSTDIR"
     File "${SOURCEDIR}\Nexus.exe"
     File "${SOURCEDIR}\README.txt"
