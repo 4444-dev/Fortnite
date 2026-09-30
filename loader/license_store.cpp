@@ -13,6 +13,8 @@
 namespace loader::license_store {
 namespace {
 
+constexpr std::size_t kMaxLicenseLength = 4096;
+
 bool ValidSlug(std::string_view slug) {
 	if (slug.empty() || slug.size() > 64) {
 		return false;
@@ -67,7 +69,7 @@ bool Save(
 	std::string_view productSlug,
 	const std::string& license
 ) {
-	if (!ValidSlug(productSlug) || license.empty()) {
+	if (!ValidSlug(productSlug) || license.empty() || license.size() > kMaxLicenseLength) {
 		return false;
 	}
 
@@ -194,6 +196,11 @@ bool Load(
 	}
 
 	if (!descriptionMatches) {
+		LocalFree(output.pbData);
+		return false;
+	}
+
+	if (output.cbData == 0 || output.cbData > kMaxLicenseLength) {
 		LocalFree(output.pbData);
 		return false;
 	}
