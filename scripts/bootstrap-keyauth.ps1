@@ -50,24 +50,18 @@ Remove-Item (Join-Path $target "killEmulator.hpp") -Force -ErrorAction SilentlyC
 # optional anti-analysis module is intentionally excluded.
 $authCpp = Join-Path $target "auth.cpp"
 $authText = Get-Content $authCpp -Raw
-$unguarded = @'
-        if(!LockMemAccess())
-        {
-            error(XorStr("LockMemAccess() failed, don't tamper with the program."));
-        }
-'@
-$guarded = @'
-#if KEYAUTH_HAVE_SECURITY
-        if(!LockMemAccess())
-        {
-            error(XorStr("LockMemAccess() failed, don't tamper with the program."));
-        }
-#endif
-'@
-if ($authText.Contains($unguarded)) {
-    $authText = $authText.Replace($unguarded, $guarded)
-    Set-Content -Path $authCpp -Value $authText -NoNewline
+$lockMemPattern = '(?ms)^(?<indent>[ \\t]*)if\\s*\\(\\s*!LockMemAccess\\(\\)\\s*\\)\\s*\\r?\\n\\k<indent>\\{\\s*\\r?\\n\\k<indent>[ \\t]+error\\(XorStr\\("LockMemAccess\\(\\) failed, don''t tamper with the program\\."\\)\\);\\s*\\r?\\n\\k<indent>\\}'
+$lockMemMatches = [regex]::Matches($authText, $lockMemPattern)
+if ($lockMemMatches.Count -ne 1) {
+    throw "Expected exactly one unguarded LockMemAccess block, found $($lockMemMatches.Count)."
 }
+$authText = [regex]::Replace(
+    $authText,
+    $lockMemPattern,
+    { param($match) "#if KEYAUTH_HAVE_SECURITY`r`n$($match.Value)`r`n#endif" },
+    1
+)
+Set-Content -Path $authCpp -Value $authText -NoNewline
 
 # Upstream Tfa::handleInput() is declared to return Tfa& but currently falls
 # through without a return. Add the missing return so MSVC can compile it.
