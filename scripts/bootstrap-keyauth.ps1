@@ -39,53 +39,99 @@ if ($current -ne $pinnedCommit) {
     }
 }
 
-# The upstream library conditionally enables these modules when the files exist.
-# Authentication remains enabled; these optional anti-analysis/emulator modules
-# are intentionally excluded from this project.
+# Authentication remains enabled. These optional upstream anti-analysis/emulator
+# modules are intentionally excluded from this project.
 Remove-Item (Join-Path $target "Security.hpp") -Force -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $target "killEmulator.hpp") -Force -ErrorAction SilentlyContinue
 
-# Upstream currently contains one unguarded LockMemAccess() call even though
-# Security.hpp is optional. Guard that call so the SDK still compiles when the
-# optional anti-analysis module is intentionally excluded.
 $authCpp = Join-Path $target "auth.cpp"
-$authText = Get-Content $authCpp -Raw
-$lockMemPattern = '(?ms)^(?<indent>[ \\t]*)if\\s*\\(\\s*!LockMemAccess\\(\\)\\s*\\)\\s*\\r?\\n\\k<indent>\\{\\s*\\r?\\n\\k<indent>[ \\t]+error\\(XorStr\\("LockMemAccess\\(\\) failed, don''t tamper with the program\\."\\)\\);\\s*\\r?\\n\\k<indent>\\}'
-$lockMemMatches = [regex]::Matches($authText, $lockMemPattern)
-if ($lockMemMatches.Count -ne 1) {
-    throw "Expected exactly one unguarded LockMemAccess block, found $($lockMemMatches.Count)."
-}
-$authText = [regex]::Replace(
-    $authText,
-    $lockMemPattern,
-    { param($match) "#if KEYAUTH_HAVE_SECURITY`r`n$($match.Value)`r`n#endif" },
-    1
-)
-Set-Content -Path $authCpp -Value $authText -NoNewline
-
-# Upstream Tfa::handleInput() is declared to return Tfa& but currently falls
-# through without a return. Add the missing return so MSVC can compile it.
-$tfaTail = @'
-		instance.disable2fa(code);
-	}
-
+$lines = [System.Collections.Generic.List[string]]::new()
+foreach ($line in (Get-Content $authCpp)) {
+    $lines.Add($line)
 }
 
-void KeyAuth::api::web_login()
-'@
-$tfaFixed = @'
-		instance.disable2fa(code);
-	}
-
-    return *this;
+# Upstream has one unguarded LockMemAccess() block even though Security.hpp is
+# optional. Guard only that block when Security.hpp has intentionally been
+# removed.
+$lockIndex = -1
+for ($i = 0; $i -lt $lines.Count; $i++) {
+    if ($lines[$i] -match '^\s*if\s*\(\s*!LockMemAccess\(\)\s*\)') {
+        $lockIndex = $i
+        break
+    }
 }
 
-void KeyAuth::api::web_login()
-'@
-if ($authText.Contains($tfaTail)) {
-    $authText = $authText.Replace($tfaTail, $tfaFixed)
-    Set-Content -Path $authCpp -Value $authText -NoNewline
+if ($lockIndex -lt 0) {
+    throw "Could not locate the unguarded LockMemAccess() block."
 }
+
+$lockEnd = -1
+for ($i = $lockIndex + 1; $i -lt $lines.Count; $i++) {
+    if ($lines[$i].Trim() -eq "}") {
+        $lockEnd = $i
+        break
+    }
+}
+
+if ($lockEnd -lt 0) {
+    throw "Could not locate the end of the LockMemAccess() block."
+}
+
+$lines.Insert($lockEnd + 1, "#endif")
+$lines.Insert($lockIndex, "#if KEYAUTH_HAVE_SECURITY")
+
+# Upstream Tfa::handleInput() is declared to return Tfa& but falls through
+# without returning. Add the missing return at the function's final brace.
+$tfaStart = -1
+for ($i = 0; $i -lt $lines.Count; $i++) {
+    if ($lines[$i] -match '^KeyAuth::api::Tfa&\s+KeyAuth::api::Tfa::handleInput') {
+        $tfaStart = $i
+        break
+    }
+}
+
+if ($tfaStart -lt 0) {
+    throw "Could not locate KeyAuth Tfa::handleInput()."
+}
+
+$depth = 0
+$started = $false
+$tfaEnd = -1
+
+for ($i = $tfaStart; $i -lt $lines.Count; $i++) {
+    $openCount = ([regex]::Matches($lines[$i], '\{')).Count
+    $closeCount = ([regex]::Matches($lines[$i], '\}')).Count
+
+    if ($openCount -gt 0) {
+        $started = $true
+    }
+
+    $depth += $openCount
+    $depth -= $closeCount
+
+    if ($started -and $depth -eq 0) {
+        $tfaEnd = $i
+        break
+    }
+}
+
+if ($tfaEnd -lt 0) {
+    throw "Could not locate the end of KeyAuth Tfa::handleInput()."
+}
+
+$alreadyReturns = $false
+for ($i = $tfaStart; $i -le $tfaEnd; $i++) {
+    if ($lines[$i] -match 'return\s+\*this\s*;') {
+        $alreadyReturns = $true
+        break
+    }
+}
+
+if (-not $alreadyReturns) {
+    $lines.Insert($tfaEnd, "    return *this;")
+}
+
+Set-Content -Path $authCpp -Value $lines
 
 $actual = Get-CurrentCommit
 if ($actual -ne $pinnedCommit) {
