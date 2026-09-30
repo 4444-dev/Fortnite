@@ -102,7 +102,11 @@ jobs:
       - name: Run tests
         shell: pwsh
         run: |
-          & ".\tests\bin\x64\${{ matrix.configuration }}\luvkrimes-tests.exe"
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $testExecutable = ".\tests\bin\x64\${{ matrix.configuration }}\luvkrimes-tests.exe"
+
+          foreach ($attempt in 1..2) {
+            & $testExecutable
+            if ($LASTEXITCODE -ne 0) {
+              throw "Regression test pass $attempt failed with exit code $LASTEXITCODE."
+            }
           }
