@@ -624,7 +624,7 @@ bool ProductCard(
 	);
 
 	draw->AddText(
-		cursor + ImVec2(16.0f, 18.0f),
+		ImVec2(cursor.x + 16.0f, cursor.y + 18.0f),
 		product.Configured
 			? IM_COL32(235, 235, 238, 255)
 			: IM_COL32(120, 120, 125, 255),
@@ -632,13 +632,16 @@ bool ProductCard(
 	);
 
 	draw->AddText(
-		cursor + ImVec2(16.0f, 46.0f),
+		ImVec2(cursor.x + 16.0f, cursor.y + 46.0f),
 		IM_COL32(140, 140, 148, 255),
 		product.Subtitle.data()
 	);
 
 	draw->AddText(
-		cursor + ImVec2(16.0f, size.y - 30.0f),
+		ImVec2(
+			cursor.x + 16.0f,
+			cursor.y + size.y - 30.0f
+		),
 		product.Configured
 			? IM_COL32(171, 107, 242, 255)
 			: IM_COL32(180, 100, 100, 255),
