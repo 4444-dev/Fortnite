@@ -79,7 +79,7 @@ inline constexpr std::array<ProductDefinition, 2> Products{{
 		"",
 		L"NEXUS_TARGET_APEX",
 		L"LUVKRIMES_TARGET_APEX",
-		L"",
+		L"projects\\apex\\Nexus-Apex-Radar.exe",
 		false
 	}
 }};
