@@ -19,6 +19,7 @@ jobs:
   build:
     name: ${{ matrix.configuration }} x64
     runs-on: windows-latest
+    timeout-minutes: 20
 
     strategy:
       fail-fast: false
