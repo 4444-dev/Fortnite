@@ -23,6 +23,15 @@ AuthController::~AuthController() {
 }
 
 void AuthController::Initialize() {
+	if (!m_Product.Configured) {
+		std::scoped_lock lock(m_Mutex);
+		m_Snapshot.State = AuthState::Error;
+		m_Snapshot.Status = "Product authentication configuration is incomplete.";
+		m_Snapshot.Busy = false;
+		m_Snapshot.Authenticated = false;
+		return;
+	}
+
 	Run(
 		AuthState::Connecting,
 		"Connecting to " + std::string(m_Product.DisplayName) + "...",
@@ -50,10 +59,14 @@ void AuthController::Initialize() {
 }
 
 void AuthController::Authenticate(std::string license, bool remember) {
-	if (license.empty()) {
+	if (license.empty() || license.size() > license_store::kMaxLicenseLength) {
 		std::scoped_lock lock(m_Mutex);
 		m_Snapshot.State = AuthState::Error;
-		m_Snapshot.Status = "Enter a license key.";
+		m_Snapshot.Status = license.empty()
+			? "Enter a license key."
+			: "License key exceeds the supported length.";
+		m_Snapshot.Busy = false;
+		m_Snapshot.Authenticated = false;
 		return;
 	}
 
@@ -168,30 +181,41 @@ void AuthController::Run(
 		m_Snapshot.Busy = true;
 	}
 
-	m_Worker = std::thread(
-		[this, task = std::move(task)]() mutable {
-			try {
-				task();
-			} catch (const std::exception& exception) {
-				std::scoped_lock lock(m_Mutex);
-				m_Snapshot.State = AuthState::Error;
-				m_Snapshot.Status = exception.what();
-				m_Snapshot.Authenticated = false;
-			} catch (...) {
-				std::scoped_lock lock(m_Mutex);
-				m_Snapshot.State = AuthState::Error;
-				m_Snapshot.Status = "Unexpected authentication error.";
-				m_Snapshot.Authenticated = false;
-			}
+	try {
+		m_Worker = std::thread(
+			[this, task = std::move(task)]() mutable {
+				try {
+					task();
+				} catch (const std::exception& exception) {
+					std::scoped_lock lock(m_Mutex);
+					m_Snapshot.State = AuthState::Error;
+					m_Snapshot.Status = exception.what();
+					m_Snapshot.Authenticated = false;
+				} catch (...) {
+					std::scoped_lock lock(m_Mutex);
+					m_Snapshot.State = AuthState::Error;
+					m_Snapshot.Status = "Unexpected authentication error.";
+					m_Snapshot.Authenticated = false;
+				}
 
-			{
-				std::scoped_lock lock(m_Mutex);
-				m_Snapshot.Busy = false;
-			}
+				{
+					std::scoped_lock lock(m_Mutex);
+					m_Snapshot.Busy = false;
+				}
 
-			m_Busy.store(false);
-		}
-	);
+				m_Busy.store(false);
+			}
+		);
+	} catch (const std::exception& exception) {
+		std::scoped_lock lock(m_Mutex);
+		m_Snapshot.State = AuthState::Error;
+		m_Snapshot.Status =
+			"Unable to start authentication worker: " +
+			std::string(exception.what());
+		m_Snapshot.Busy = false;
+		m_Snapshot.Authenticated = false;
+		m_Busy.store(false);
+	}
 }
 
 void AuthController::JoinWorker() {
