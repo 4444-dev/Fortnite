@@ -5,6 +5,12 @@ $pinnedCommit = "486c83e6259f508ba0396f3156e50792a34a4576"
 $root = Split-Path -Parent $PSScriptRoot
 $target = Join-Path $root "thirdparty\keyauth"
 
+function Assert-GitSuccess([string]$operation) {
+    if ($LASTEXITCODE -ne 0) {
+        throw "Git operation failed: $operation (exit code $LASTEXITCODE)."
+    }
+}
+
 function Get-CurrentCommit {
     if (-not (Test-Path (Join-Path $target ".git"))) {
         return ""
@@ -12,7 +18,9 @@ function Get-CurrentCommit {
 
     Push-Location $target
     try {
-        return (git rev-parse HEAD).Trim()
+        $commit = git rev-parse HEAD
+        Assert-GitSuccess "rev-parse HEAD"
+        return ($commit | Out-String).Trim()
     }
     finally {
         Pop-Location
@@ -30,9 +38,29 @@ if ($current -ne $pinnedCommit) {
     Push-Location $target
     try {
         git init | Out-Null
+        Assert-GitSuccess "init"
+
         git remote add origin $repoUrl
+        Assert-GitSuccess "remote add origin"
+
         git fetch --depth 1 origin $pinnedCommit
-        git checkout --detach FETCH_HEAD
+        Assert-GitSuccess "fetch pinned KeyAuth commit"
+
+        git checkout --detach FETCH_HEAD | Out-Null
+        Assert-GitSuccess "checkout pinned KeyAuth commit"
+    }
+    finally {
+        Pop-Location
+    }
+}
+else {
+    # The dependency directory is generated and ignored. Reset it before
+    # applying our compatibility patch so repeated local builds are
+    # deterministic and cannot stack duplicate preprocessor guards.
+    Push-Location $target
+    try {
+        git reset --hard $pinnedCommit | Out-Null
+        Assert-GitSuccess "reset pinned KeyAuth commit"
     }
     finally {
         Pop-Location
@@ -45,8 +73,12 @@ Remove-Item (Join-Path $target "Security.hpp") -Force -ErrorAction SilentlyConti
 Remove-Item (Join-Path $target "killEmulator.hpp") -Force -ErrorAction SilentlyContinue
 
 $authCpp = Join-Path $target "auth.cpp"
+if (-not (Test-Path -LiteralPath $authCpp -PathType Leaf)) {
+    throw "KeyAuth bootstrap is incomplete: auth.cpp was not found."
+}
+
 $lines = [System.Collections.Generic.List[string]]::new()
-foreach ($line in (Get-Content $authCpp)) {
+foreach ($line in (Get-Content -LiteralPath $authCpp)) {
     $lines.Add($line)
 }
 
@@ -131,7 +163,7 @@ if (-not $alreadyReturns) {
     $lines.Insert($tfaEnd, "    return *this;")
 }
 
-Set-Content -Path $authCpp -Value $lines
+Set-Content -LiteralPath $authCpp -Value $lines
 
 $actual = Get-CurrentCommit
 if ($actual -ne $pinnedCommit) {
