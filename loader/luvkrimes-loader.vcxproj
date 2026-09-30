@@ -90,6 +90,7 @@
     <ClCompile Include="auth_controller.cpp" />
     <ClCompile Include="launch_target.cpp" />
     <ClCompile Include="loader_renderer.cpp" />
+    <ClCompile Include="loader_ui.cpp" />
     <ClCompile Include="loader_window.cpp" />
     <ClCompile Include="license_store.cpp" />
     <ClCompile Include="..\luvkrimes base\thirdparty\imgui\imgui.cpp">
@@ -131,6 +132,7 @@
     <ClInclude Include="auth_controller.hpp" />
     <ClInclude Include="launch_target.hpp" />
     <ClInclude Include="loader_renderer.hpp" />
+    <ClInclude Include="loader_ui.hpp" />
     <ClInclude Include="loader_window.hpp" />
     <ClInclude Include="license_store.hpp" />
     <ClInclude Include="product_registry.hpp" />
